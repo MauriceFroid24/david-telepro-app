@@ -1,6 +1,6 @@
-# Assistant Télépro - Projet Énergie v5
+# Assistant Télépro Énergie — Version iPad éco batterie (v6)
 
-Application Streamlit pour qualifier rapidement les prospects PAC / ITE / Photovoltaïque.
+Version optimisée pour iPad / PC : navigation page par page, boutons Retour / Suivant, interface légère, moins de blocs affichés en même temps.
 
 ## Installation Streamlit Cloud
 
@@ -9,12 +9,11 @@ Application Streamlit pour qualifier rapidement les prospects PAC / ITE / Photov
    - `app.py`
    - `requirements.txt`
    - `README.md`
-3. Sur Streamlit Cloud : `Manage app` puis `Reboot` ou `Redeploy`.
+3. Vérifier que les fichiers sont à la racine du dépôt GitHub.
+4. Sur Streamlit Cloud : `Manage app` → `Reboot` ou `Redeploy`.
 
-## Notes v5
+## Utilisation
 
-- Aucune mention de Maurice dans le script côté prospect.
-- Le rendez-vous est présenté comme l’intervention d’un expert / ingénieur thermicien mandaté.
-- Les champs ne sont pas préremplis : ce qui est vide reste à faire.
-- Différenciation PAC air/eau, PAC air/air, ITE, photovoltaïque, BTD et projet personnalisé.
-- Date, heure et adresse demandées à la fin, après qualification.
+David suit les pages dans l’ordre : contact, projet, logement, motivation, engagement, décideurs/RDV, documents, rapport.
+
+Les champs restent vides tant qu’ils ne sont pas complétés, ce qui permet de voir rapidement ce qui reste à faire.
