@@ -1,351 +1,427 @@
 import streamlit as st
-from datetime import datetime, date, time
+from datetime import date, time
 from urllib.parse import quote
 
-st.set_page_config(page_title="Maurice Qualification Télépro", page_icon="📞", layout="wide")
+st.set_page_config(
+    page_title="Maurice Télépro – Qualification RDV",
+    page_icon="📞",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
+# -----------------------------
+# STYLE
+# -----------------------------
 st.markdown("""
 <style>
-.block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
-.big-card {background: #f7f7f9; padding: 18px; border-radius: 16px; border: 1px solid #e6e6ea; margin-bottom: 12px;}
-.script {background:#ffffff;padding:14px;border-radius:14px;border:1px solid #dedee6;margin:8px 0;}
-.say {background:#eef3ff;padding:12px;border-radius:12px;border-left:5px solid #3467eb;margin:8px 0;}
-.warning {background:#fff4e5;padding:12px;border-radius:12px;border-left:5px solid #ff9900;margin:8px 0;}
-.good {background:#e9f8ef;padding:12px;border-radius:12px;border-left:5px solid #19a35b;}
-.mid {background:#fff6e6;padding:12px;border-radius:12px;border-left:5px solid #f0a000;}
-.bad {background:#fdecec;padding:12px;border-radius:12px;border-left:5px solid #d93636;}
-.small {font-size: 0.9rem; color:#555;}
+:root {
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --text: #172033;
+  --muted: #667085;
+  --primary: #1f4ed8;
+  --primary-soft: #eaf0ff;
+  --green: #15803d;
+  --orange: #c2410c;
+  --red: #b91c1c;
+  --border: #e5e7eb;
+}
+html, body, [data-testid="stAppViewContainer"] { background: var(--bg); }
+[data-testid="stHeader"] { background: rgba(246,248,251,.85); }
+.block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1280px; }
+.hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1f4ed8 100%);
+  color: white; padding: 22px 26px; border-radius: 22px;
+  box-shadow: 0 18px 50px rgba(15,23,42,.15); margin-bottom: 18px;
+}
+.hero h1 { margin: 0; font-size: 30px; letter-spacing: -0.02em; }
+.hero p { margin: 8px 0 0; color: rgba(255,255,255,.85); font-size: 16px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+  padding: 18px 20px; box-shadow: 0 10px 30px rgba(15,23,42,.05); margin-bottom: 14px;
+}
+.script {
+  background: #0f172a; color: white; border-radius: 16px; padding: 16px 18px; margin: 10px 0 16px;
+  border-left: 6px solid #60a5fa;
+}
+.script .label { color: #93c5fd; text-transform: uppercase; font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: 6px; }
+.script p { margin: 0; font-size: 18px; line-height: 1.45; }
+.warning {
+  background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+}
+.good {
+  background: #ecfdf5; border: 1px solid #bbf7d0; color: #14532d; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+}
+.bad {
+  background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+}
+.metric-card {
+  background: white; border-radius: 18px; border: 1px solid var(--border); padding: 16px;
+  text-align: center; box-shadow: 0 10px 30px rgba(15,23,42,.05);
+}
+.metric-card .big { font-size: 36px; font-weight: 800; margin: 0; }
+.metric-card .small { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.pill { display:inline-block; padding: 5px 10px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; font-weight:700; font-size:12px; margin-right:6px; }
+textarea { min-height: 90px!important; }
+.stButton > button { border-radius: 12px; font-weight: 700; min-height: 42px; }
+[data-testid="stForm"] { border: 0; padding: 0; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 18px 0; }
+.copybox {
+  background: #101828; color: #f9fafb; padding: 18px; border-radius: 16px; white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; line-height: 1.5;
+}
 </style>
 """, unsafe_allow_html=True)
 
-if "history" not in st.session_state:
-    st.session_state.history = []
+# -----------------------------
+# HELPERS
+# -----------------------------
+def init_state():
+    defaults = {
+        "lead_status": "",
+        "owner": "Oui",
+        "house": "Oui",
+        "main_residence": "Oui",
+        "decision_ready": "",
+        "deciders_present": "",
+        "address_ok": "",
+        "score_notes": [],
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
-def yesno(label, key):
-    return st.radio(label, ["Oui", "Non", "Je ne sais pas"], horizontal=True, key=key)
+init_state()
 
-def say(text):
-    st.markdown(f"<div class='say'><b>Phrase à dire :</b><br>{text}</div>", unsafe_allow_html=True)
+def yn(label, key, help_text=None):
+    return st.radio(label, ["Oui", "Non", "À confirmer"], horizontal=True, key=key, help=help_text)
+
+def script(text):
+    st.markdown(f"""
+    <div class='script'>
+      <div class='label'>Phrase à dire</div>
+      <p>{text}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 def tip(text):
-    st.markdown(f"<div class='warning'><b>Conseil Maurice :</b><br>{text}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='good'>✅ {text}</div>", unsafe_allow_html=True)
 
-def score_lead(d):
-    score = 0
-    reasons = []
-    for field, points, label in [
-        ("proprietaire", 12, "propriétaire"),
-        ("maison", 10, "maison individuelle"),
-        ("res_principale", 8, "résidence principale"),
-        ("radiateurs_eau", 8, "réseau radiateurs/plancher compatible"),
-        ("decideurs_presents", 15, "tous les décideurs présents"),
-    ]:
-        if d.get(field) == "Oui":
-            score += points; reasons.append(f"+{points} {label}")
-        elif d.get(field) == "Non":
-            score -= points; reasons.append(f"-{points} {label} absent")
-    chauffage = d.get("chauffage", "")
-    if chauffage in ["Gaz", "Fioul"]:
-        score += 12; reasons.append("+12 chauffage gaz/fioul")
-    elif chauffage:
-        score += 3; reasons.append("+3 chauffage à vérifier")
-    try:
-        age = int(d.get("age_chaudiere", 0) or 0)
-        if age >= 18:
-            score += 12; reasons.append("+12 chaudière ancienne")
-        elif age >= 10:
-            score += 6; reasons.append("+6 chaudière intermédiaire")
-    except Exception:
-        pass
-    try:
-        surface = int(d.get("surface", 0) or 0)
-        if surface >= 130:
-            score += 12; reasons.append("+12 surface forte")
-        elif surface >= 90:
-            score += 8; reasons.append("+8 surface correcte")
-        elif surface > 0:
-            score -= 5; reasons.append("-5 surface faible")
-    except Exception:
-        pass
-    try:
-        facture = int(d.get("facture", 0) or 0)
-        if facture >= 180:
-            score += 10; reasons.append("+10 facture élevée")
-        elif facture >= 120:
-            score += 6; reasons.append("+6 facture significative")
-    except Exception:
-        pass
-    motivation = d.get("motivation_note", 0)
-    score += int(motivation) * 3
-    reasons.append(f"+{int(motivation)*3} motivation {motivation}/10")
-    engagement = d.get("pret_si_ok", "")
-    if engagement == "Oui":
-        score += 18; reasons.append("+18 prêt à avancer si voyants au vert")
-    elif engagement == "Non":
-        score -= 35; reasons.append("-35 pas prêt à avancer")
-    else:
-        score -= 10; reasons.append("-10 engagement flou")
-    reds = d.get("red_flags", [])
-    red_penalties = {
-        "Veut juste comparer": -25,
-        "Décideur absent": -25,
-        "Projet dans plus de 12 mois": -20,
-        "Ne veut rien changer": -40,
-        "Cherche uniquement le prix": -15,
-        "Méfiance forte / arnaque": -10,
-        "Pas de disponibilité réelle": -25,
-        "Demande déjà plusieurs études": -20,
-    }
-    for r in reds:
-        score += red_penalties.get(r, 0)
-        reasons.append(f"{red_penalties.get(r, 0)} {r}")
-    return max(0, min(100, score)), reasons
+def alert(text):
+    st.markdown(f"<div class='warning'>⚠️ {text}</div>", unsafe_allow_html=True)
 
-def quality_label(score):
-    if score >= 75:
-        return "🟢 Excellent RDV — à prioriser"
-    if score >= 55:
-        return "🟠 RDV moyen — à sécuriser avant déplacement"
-    return "🔴 RDV risqué — éviter ou requalifier"
+def danger(text):
+    st.markdown(f"<div class='bad'>⛔ {text}</div>", unsafe_allow_html=True)
 
-def build_report(d, score, reasons):
-    now = datetime.now().strftime("%d/%m/%Y %H:%M")
-    lines = []
-    lines.append("RAPPORT RDV TÉLÉPRO - DAVID / MAURICE")
-    lines.append(f"Créé le : {now}")
-    lines.append("")
-    lines.append(f"Score : {score}/100 - {quality_label(score)}")
-    lines.append("")
-    lines.append("IDENTITÉ")
-    lines.append(f"Prospect : {d.get('civilite','')} {d.get('nom','')}")
-    lines.append(f"Téléphone : {d.get('telephone','')}")
-    lines.append(f"Adresse : {d.get('adresse','')} {d.get('cp','')} {d.get('ville','')}")
-    lines.append(f"RDV expert/ingénieur : {d.get('rdv_date','')} à {d.get('rdv_time','')}")
-    lines.append("")
-    lines.append("QUALIFICATION")
-    lines.append(f"Propriétaire : {d.get('proprietaire','')}")
-    lines.append(f"Maison individuelle : {d.get('maison','')}")
-    lines.append(f"Résidence principale : {d.get('res_principale','')}")
-    lines.append(f"Surface : {d.get('surface','')} m²")
-    lines.append(f"Chauffage actuel : {d.get('chauffage','')}")
-    lines.append(f"Âge chaudière / système : {d.get('age_chaudiere','')} ans")
-    lines.append(f"ECS : {d.get('ecs','')}")
-    lines.append(f"Émetteurs : {d.get('emetteurs','')}")
-    lines.append(f"Facture énergie : environ {d.get('facture','')} €/mois")
-    lines.append("")
-    lines.append("MOTIVATION CLIENT")
-    lines.append(f"Déclencheur : {d.get('declencheur','')}")
-    lines.append(f"Gêne principale : {d.get('gene','')}")
-    lines.append(f"Si rien ne change : {d.get('risque','')}")
-    lines.append(f"Ce que ça changerait : {d.get('changement','')}")
-    lines.append(f"Motivation : {d.get('motivation_note','')}/10")
-    lines.append("")
-    lines.append("DÉCISION")
-    lines.append(f"Décideur final : {d.get('decideur','')}")
-    lines.append(f"Tous décideurs présents : {d.get('decideurs_presents','')}")
-    lines.append(f"Prêt à lancer si technique + aides + budget OK : {d.get('pret_si_ok','')}")
-    lines.append(f"Ce qui pourrait bloquer : {d.get('blocage','')}")
-    lines.append("")
-    lines.append("DOCUMENTS")
-    lines.append(", ".join(d.get("docs", [])) or "Aucun document confirmé")
-    lines.append("")
-    lines.append("ALERTES")
-    lines.append(", ".join(d.get("red_flags", [])) or "Aucune alerte majeure")
-    lines.append("")
-    lines.append("NOTES EXACTES DU CLIENT")
-    lines.append(d.get("notes_exactes", ""))
-    lines.append("")
-    lines.append("RAISONS DU SCORE")
-    lines.extend(reasons)
-    return "\n".join(lines)
+def add_score(condition, points, label, notes):
+    if condition:
+        notes.append((points, label))
+        return points
+    return 0
 
-st.title("📞 Maurice — Assistant Télépro David")
-st.caption("Objectif : qualifier des RDV closables, protéger les kilomètres terrain, et transmettre un maximum d’informations utiles à Maurice.")
+# -----------------------------
+# HEADER
+# -----------------------------
+st.markdown("""
+<div class='hero'>
+  <h1>📞 Maurice Télépro — Assistant de qualification</h1>
+  <p>Objectif : qualifier vite, rassurer proprement et envoyer à Maurice des rendez-vous réellement closables.</p>
+</div>
+""", unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["1. Appel guidé", "2. Déballe / Conseils", "3. Rapport", "4. Historique"])
+left, mid, right = st.columns([1,1,1])
+with left:
+    st.markdown("<span class='pill'>iPad / PC</span><span class='pill'>Rapide</span><span class='pill'>Sans mémoire</span>", unsafe_allow_html=True)
+with mid:
+    st.caption("Les données ne sont pas sauvegardées automatiquement : copier le rapport final dans Alltoo.")
+with right:
+    if st.button("🔄 Nouveau lead / vider l'écran", use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
 
-with tab1:
-    st.subheader("Appel guidé")
-    st.info("Règle d'or : David ne vend pas une PAC et n'annonce pas un commercial. Il vérifie si le projet mérite de mandater un expert/ingénieur à domicile.")
-    with st.form("lead_form"):
-        st.markdown("### A) Identification rapide")
-        say("Bonjour Monsieur / Madame [Nom], David à l'appareil. Je vous appelle suite à votre demande d'informations concernant les solutions pour réduire votre consommation d'énergie dans votre logement. Je vais simplement vérifier quelques points pour savoir si ça vaut réellement la peine de mandater un expert/ingénieur à votre domicile.")
-        tip("Ne jamais dire Froid24. Ne jamais dire installateur. Ne jamais dire commercial. Dire : expert, ingénieur, spécialiste projet ou conseiller technique.")
+# -----------------------------
+# SIDEBAR
+# -----------------------------
+with st.sidebar:
+    st.title("Règles d'or")
+    st.write("✅ Parler d'une **validation projet**")
+    st.write("✅ Dire **Maurice, expert/ingénieur**")
+    st.write("✅ Demander l'adresse seulement quand le prospect est qualifié")
+    st.write("✅ Fixer date/heure uniquement à la fin")
+    st.divider()
+    st.write("❌ Ne jamais dire Froid24")
+    st.write("❌ Ne jamais dire démarche gouvernementale")
+    st.write("❌ Ne pas dire bureau d'étude agréé ANAH si ce n'est pas juridiquement exact")
+    st.write("❌ Ne pas demander : avez-vous déjà fait une étude ?")
+    st.write("❌ Ne pas annoncer de prix cash")
+    st.write("❌ Ne pas annoncer une prime H1 si le prospect est en H2/H3")
+    st.write("❌ Ne pas présenter Maurice comme un commercial")
+
+# -----------------------------
+# LAYOUT
+# -----------------------------
+col_form, col_live = st.columns([1.35, .9], gap="large")
+
+with col_form:
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["1. Contact", "2. Qualification", "3. Motivation", "4. Engagement", "5. RDV"])
+
+    with tab1:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("1. Ouverture sans créer de méfiance")
+        script("Bonjour, je parle bien à Monsieur / Madame ? Je m'appelle David. Je vous appelle suite à votre demande d'informations concernant les solutions pour améliorer votre chauffage ou réduire vos dépenses d'énergie. Je vais simplement vérifier si votre maison peut réellement mériter le déplacement de Maurice, notre expert thermicien. Est-ce que je peux vous poser quelques questions rapides ?")
+        alert("Ne cite jamais Froid24. Ne dis pas que c'est une démarche gouvernementale. Tu réactives une demande d'information, puis tu qualifies sans créer de comparatif.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            prenom = st.text_input("Prénom du prospect", placeholder="Ex : Jean")
+            nom = st.text_input("Nom du prospect", placeholder="Ex : Martin")
+            tel = st.text_input("Téléphone", placeholder="Ex : 06...")
+        with c2:
+            civilite = st.selectbox("Civilité", ["Monsieur", "Madame", "Monsieur et Madame", "À confirmer"])
+            source = st.selectbox("Sujet initial du lead", ["PAC", "ITE", "Photovoltaïque", "Économies d'énergie", "Ne sait plus", "Autre"])
+            email = st.text_input("Email", placeholder="Ex : client@email.fr")
+            humeur = st.select_slider("Température du contact", options=["Froid", "Neutre", "Ouvert", "Très ouvert"], value="Neutre")
+
+        rappel_demande = st.radio("Le prospect reconnaît-il la demande ?", ["Oui", "Ne sait plus", "Non"], horizontal=True)
+        if rappel_demande == "Ne sait plus":
+            script("Pas de souci, je comprends. On reçoit souvent des demandes faites après une simulation ou une recherche sur les aides énergie. Je ne vais pas vous déranger longtemps : je vérifie simplement si votre logement peut être concerné ou non.")
+        elif rappel_demande == "Non":
+            danger("Lead à risque. Reste poli, ne force pas. Tu peux qualifier très court, mais ne crée pas de faux RDV.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with tab2:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("2. Qualification technique rapide")
+        script("Avant de parler de rendez-vous, je dois vérifier si votre logement rentre dans les critères techniques. Sinon, je préfère vous le dire tout de suite plutôt que de vous faire perdre du temps.")
         c1, c2, c3 = st.columns(3)
         with c1:
-            civilite = st.selectbox("Civilité", ["Monsieur", "Madame", "Monsieur et Madame", ""])
-            nom = st.text_input("Nom prospect")
-            telephone = st.text_input("Téléphone")
+            owner = yn("Propriétaire ?", "owner")
+            house = yn("Maison individuelle ?", "house")
+            main_residence = yn("Résidence principale ?", "main_residence")
         with c2:
-            adresse = st.text_input("Adresse")
-            cp = st.text_input("Code postal")
-            ville = st.text_input("Ville")
+            surface = st.number_input("Surface chauffée approximative (m²)", min_value=0, max_value=500, value=0, step=5)
+            occupants = st.number_input("Nombre de personnes dans le foyer", min_value=0, max_value=15, value=0, step=1)
+            anciennete_maison = st.selectbox("Maison habitée depuis", ["À confirmer", "Moins de 2 ans", "2 à 5 ans", "5 à 10 ans", "+10 ans"])
+            zone = st.selectbox("Zone climatique", ["À confirmer", "H1", "H2", "H3"])
         with c3:
-            source = st.text_input("Source lead / campagne interne", value="Lead énergie")
-            canal = st.selectbox("Thématique lead", ["PAC", "ITE", "Panneaux photovoltaïques", "Énergie / non précisé"])
+            chauffage = st.selectbox("Chauffage actuel", ["Gaz", "Fioul", "Électricité", "Bois", "PAC déjà installée", "Autre", "À confirmer"])
+            age_chaudiere = st.selectbox("Âge chaudière / système", ["À confirmer", "Moins de 5 ans", "5 à 10 ans", "10 à 15 ans", "15 à 20 ans", "+20 ans"])
+            ecs = st.selectbox("Eau chaude", ["Chaudière", "Ballon électrique", "Ballon thermodynamique", "Autre", "À confirmer"])
 
-        st.markdown("### B) Qualification logement")
-        say("Avant de parler de rendez-vous, j’ai besoin de vérifier que votre logement rentre bien dans le cadre d’une étude sérieuse. Si ce n’est pas cohérent, je préfère vous le dire tout de suite plutôt que de vous faire perdre du temps.")
-        q1, q2, q3 = st.columns(3)
-        with q1:
-            proprietaire = yesno("Vous êtes bien propriétaire ?", "prop")
-        with q2:
-            maison = yesno("C’est bien une maison individuelle ?", "maison")
-        with q3:
-            res_principale = yesno("C’est votre résidence principale ?", "res")
-        q4, q5, q6 = st.columns(3)
-        with q4:
-            surface = st.number_input("Elle fait environ combien de m² ?", min_value=0, max_value=500, value=100, step=5)
-        with q5:
-            chauffage = st.selectbox("Aujourd’hui vous chauffez avec quoi ?", ["Gaz", "Fioul", "Électrique", "Bois", "PAC existante", "Autre", "Je ne sais pas"])
-        with q6:
-            age_chaudiere = st.number_input("Votre chaudière / système a environ quel âge ?", min_value=0, max_value=60, value=15)
-        q7, q8, q9 = st.columns(3)
-        with q7:
-            ecs = st.selectbox("L’eau chaude est produite comment ?", ["Chaudière", "Ballon électrique", "Ballon thermodynamique", "Autre", "Je ne sais pas"])
-        with q8:
-            emetteurs = st.selectbox("Vous avez des radiateurs à eau ou plancher chauffant ?", ["Radiateurs à eau", "Plancher chauffant", "Radiateurs électriques", "Mixte", "Je ne sais pas"])
-            radiateurs_eau = "Oui" if emetteurs in ["Radiateurs à eau", "Plancher chauffant", "Mixte"] else "Non"
-        with q9:
-            facture = st.number_input("Facture énergie estimée €/mois", min_value=0, max_value=1000, value=150, step=10)
+        emetteurs = st.multiselect("Émetteurs de chaleur", ["Radiateurs à eau", "Plancher chauffant", "Radiateurs électriques", "Split / clim", "Autre", "À confirmer"], default=[])
+        revenu = st.selectbox("Catégorie revenus estimée", ["Ne sait pas", "Bleu", "Jaune", "Violet", "Rose", "À vérifier avec avis d'imposition"])
+        if zone in ["H2", "H3"]:
+            alert("Attention : ne jamais annoncer de prime ou condition liée à la zone H1. David doit rester général : Maurice vérifiera les aides exactes selon la zone, les revenus et le logement.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### C) Motivation réelle")
-        say("Je veux comprendre ce qui vous a fait faire la demande, parce qu’on ne déplace pas un expert pour une simple curiosité. L’objectif est de voir s’il y a un vrai sujet à régler chez vous.")
-        declencheur = st.text_area("Qu'est-ce qui vous a donné envie de demander des renseignements ?", height=70)
-        gene = st.text_area("Qu'est-ce qui vous dérange le plus aujourd'hui avec votre chauffage / vos factures ?", height=70)
-        risque = st.text_area("Si rien ne change dans 2 ans, qu'est-ce qui risque de vous embêter ?", height=70)
-        changement = st.text_area("Si on arrivait à régler ça, qu'est-ce que ça changerait pour vous ?", height=70)
-        motivation_note = st.slider("Sur 10, à quel point vous voulez réellement trouver une solution ?", 1, 10, 7)
+    with tab3:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("3. Motivation réelle du client")
+        script("J'aimerais comprendre ce qui vous a poussé à demander des renseignements. Ce n'est pas juste une question technique : l'objectif est de savoir si le projet a un vrai intérêt pour vous.")
+        motivation = st.text_area("Mot pour mot : pourquoi il s'intéresse au projet ?", placeholder="Ex : facture trop élevée, chaudière vieille, peur d'une panne, maison froide...")
+        gene = st.text_area("Qu'est-ce qui le gêne le plus aujourd'hui ?", placeholder="Ex : 250€/mois de gaz, chaudière qui tombe souvent en panne...")
+        projection = st.text_area("Si on règle le problème, qu'est-ce que ça change pour lui ?", placeholder="Ex : moins de charges, tranquillité, confort, anticiper la retraite...")
+        facture = st.text_input("Facture / budget énergie actuel", placeholder="Ex : 180€/mois, 2 400€/an, 2 cuves de fioul/an...")
+        script("Je ne vais pas vous annoncer un prix au téléphone, ce serait impossible sans voir la maison. Par contre, pour éviter de vous faire perdre du temps, si après aides le projet devait représenter une mensualité confortable, dans quelle fourchette vous vous sentiriez à l'aise ?")
+        mensualite_ok = st.selectbox("Fourchette de mensualité acceptable", ["À confirmer", "Moins de 80€/mois", "80 à 120€/mois", "120 à 180€/mois", "180 à 250€/mois", "+250€/mois", "Refuse toute mensualité", "Paiement comptant uniquement"])
+        urgence = st.select_slider("Urgence ressentie", options=["Aucune", "Faible", "Moyenne", "Forte", "Très forte"], value="Moyenne")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### D) Décision et engagement")
-        say("Je préfère vous poser la question clairement : si l’étude montre que c’est techniquement faisable, que les aides sont cohérentes et que le budget vous convient, est-ce que vous seriez prêt à avancer sur le projet ?")
-        decideur = st.text_input("Qui prendra la décision finale si le projet convient ?")
-        decideurs_presents = yesno("Toutes les personnes qui décident seront présentes ?", "decideurs")
-        pret_si_ok = yesno("Si technique + aides + budget sont OK, prêt à lancer le projet ?", "pret")
-        blocage = st.text_area("Qu'est-ce qui pourrait vous empêcher d'aller au bout ?", height=70)
-        tip("Ne pas demander : 'Avez-vous déjà fait faire une étude ?'. Ça installe l’idée de comparer. Si le prospect parle de comparaison, noter l’alerte et répondre : 'Je comprends, justement l’objectif de notre étude est de vous donner une vision complète et vérifiable pour prendre une décision proprement.'")
+    with tab4:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("4. Engagement et objections avant RDV")
+        script("Si Maurice confirme que c'est rentable, faisable techniquement, que les aides sont cohérentes et que la mensualité reste dans une zone confortable pour vous, est-ce que vous seriez prêt à monter un dossier ?")
+        decision_ready = st.radio("Réponse à la question d'engagement", ["Oui", "Pourquoi pas", "Non", "À confirmer"], horizontal=True, key="decision_ready")
+        if decision_ready in ["Pourquoi pas", "À confirmer"]:
+            script("Je comprends. Qu'est-ce qu'il faudrait voir ou vérifier pour que vous puissiez prendre une décision sereinement ?")
+        elif decision_ready == "Non":
+            danger("Très probablement non closable. Ne fixe un RDV que s'il y a une vraie raison de continuer.")
 
-        st.markdown("### E) Rendez-vous expert / ingénieur")
-        say("Très bien. Vu les éléments que vous me donnez, je peux demander à Maurice de mandater un expert/ingénieur pour venir vérifier la faisabilité technique, les aides et l’intérêt réel du projet. Ce n’est pas une visite commerciale classique : l’objectif est de valider si le projet mérite d’être lancé ou non.")
-        rdv_date = st.date_input("Date du rendez-vous", value=date.today())
-        rdv_time = st.time_input("Heure du rendez-vous", value=time(10, 0))
-        tip("Oui, la date et l’heure doivent plutôt venir à la fin, après qualification + motivation + décideurs + engagement. On peut noter une disponibilité plus tôt, mais on ne confirme qu’à la fin.")
-
-        st.markdown("### F) Documents et alertes")
-        say("Pour que l’expert puisse calculer les aides correctement et éviter un second passage, préparez si possible les documents suivants. Il vérifiera sur place ce qui est réellement utile.")
-        docs = st.multiselect("Documents que le client peut préparer", [
-            "Avis d'imposition", "Taxe foncière", "Facture énergie", "Pièces d'identité propriétaires", "RIB", "Bulletins de salaire / justificatifs revenus"
+        objections = st.multiselect("Objections / freins détectés", [
+            "Veut comparer", "Doit demander à son conjoint", "Doit demander à ses enfants", "Peur du financement",
+            "Peur des arnaques", "Ne veut pas de travaux", "Pas le budget", "Pas pressé", "A déjà une entreprise en tête",
+            "Ne fait confiance qu'à son chauffagiste", "Autre"
         ])
-        red_flags = st.multiselect("Alertes / risques", [
-            "Veut juste comparer", "Demande déjà plusieurs études", "Décideur absent", "Projet dans plus de 12 mois", "Ne veut rien changer",
-            "Cherche uniquement le prix", "Méfiance forte / arnaque", "Pas de disponibilité réelle"
-        ])
-        notes_exactes = st.text_area("Phrases exactes du client à transmettre à Maurice", height=130)
-        submitted = st.form_submit_button("✅ Générer le rapport")
+        objection_detail = st.text_area("Détails objections — mots exacts", placeholder="Ex : 'Je veux en parler à mon fils avant de décider'...")
 
-    if submitted:
-        data = locals().copy()
-        data["rdv_date"] = rdv_date.strftime("%d/%m/%Y")
-        data["rdv_time"] = rdv_time.strftime("%H:%M")
-        score, reasons = score_lead(data)
-        report = build_report(data, score, reasons)
-        st.session_state.last_report = report
-        st.session_state.last_score = score
-        st.session_state.history.append({"nom": nom, "date": data["rdv_date"], "heure": data["rdv_time"], "score": score, "rapport": report})
-        st.success("Rapport généré")
+        script("Concrètement, qui prendra la décision finale si Maurice valide que le projet est intéressant ?")
+        deciders = st.text_input("Décideur(s)", placeholder="Ex : Monsieur + Madame / fils / propriétaire indivision...")
+        deciders_present = st.radio("Tous les décideurs seront présents au RDV ?", ["Oui", "Non", "À confirmer"], horizontal=True, key="deciders_present")
+        if deciders_present != "Oui":
+            alert("RDV fragile. Il faut expliquer qu'un 2e déplacement peut être payant ou non prioritaire, donc il faut les décideurs présents.")
+            script("Comme Maurice va valider la faisabilité, la rentabilité et les conditions du projet en une seule visite, il faut que les personnes qui décident soient présentes. Sinon vous risquez d'avoir la moitié des informations et de devoir prévoir un deuxième rendez-vous, qui peut être payant ou non prioritaire.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-with tab2:
-    st.subheader("Déballe recommandée")
-    st.markdown("""
-### Ouverture
-Bonjour Monsieur / Madame [Nom], David à l'appareil. Je vous appelle suite à votre demande d'informations concernant les solutions pour réduire votre consommation d'énergie dans votre logement.
+    with tab5:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("5. Adresse puis date/heure — seulement à la fin")
+        tip("Oui, l'adresse, la date et l'heure se demandent à la fin. Avant, tu qualifies. Après, tu fixes.")
+        script("Très bien. Vu ce que vous me dites, je peux organiser le passage de Maurice lui-même pour valider le projet. Pour organiser correctement son déplacement, pouvez-vous me confirmer l'adresse exacte du logement concerné ?")
+        c1, c2 = st.columns([2,1])
+        with c1:
+            adresse = st.text_input("Adresse complète", placeholder="Numéro + rue")
+        with c2:
+            cp = st.text_input("Code postal", placeholder="Ex : 75000")
+            ville = st.text_input("Ville", placeholder="Ex : Paris")
+        adresse_ok = st.radio("Adresse confirmée ?", ["Oui", "Non", "À confirmer"], horizontal=True, key="address_ok")
 
-Je vais simplement vérifier quelques points pour savoir si ça vaut réellement la peine de mandater un expert/ingénieur à votre domicile.
+        script("Je vais vous proposer un créneau. Prévoyez environ 1h30 à 2h, car Maurice va vérifier la partie technique, les aides, la rentabilité, le budget, puis décider si un dossier peut être monté et présenté en commission sous 24h, sous réserve d'un dossier complet.")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            rdv_date = st.date_input("Date du RDV", value=date.today())
+        with c2:
+            rdv_time = st.time_input("Heure du RDV", value=time(10, 0))
+            famille_enfants = st.radio("Famille avec enfants à la maison ?", ["Non", "Oui", "À confirmer"], horizontal=True)
+        with c3:
+            duree = st.selectbox("Durée annoncée", ["1h30", "2h", "2h30"])
 
-Si je vois que ce n'est pas pertinent, je préfère vous le dire maintenant plutôt que de vous faire perdre du temps. Est-ce que vous avez deux minutes ?
+        docs = st.multiselect("Documents à préparer / envoyer", [
+            "Avis d'imposition complet", "Taxe foncière", "Facture énergie", "Pièces d'identité", "RIB", "Bulletins de salaire / justificatifs revenus", "Photos chaudière", "Photos radiateurs", "Photos compteur / tableau électrique"
+        ], default=["Avis d'imposition complet", "Taxe foncière", "Facture énergie", "Pièces d'identité", "RIB"])
 
-### Positionnement
-Notre rôle n'est pas de remplacer systématiquement les chaudières. L'objectif est d'abord de vérifier si votre maison mérite réellement cet investissement : faisabilité technique, aides, budget et économies.
+        script("Pour gagner du temps le jour du passage de Maurice, pouvez-vous préparer ces documents dans un dossier, soit en PDF, soit en photos bien lisibles ? Je vous envoie la liste par mail et je reste avec vous quelques secondes pour vérifier que vous l'avez bien reçue.")
+        mail_envoye = st.radio("Mail liste documents envoyé ?", ["Oui", "Non", "À faire"], horizontal=True)
+        mail_recu = st.radio("Client confirme réception du mail ?", ["Oui", "Non", "À confirmer"], horizontal=True)
+        if mail_recu != "Oui":
+            alert("Ne pas finir l'appel sans confirmer la réception du mail si possible. C'est un gros indicateur de sérieux.")
 
-Si tous les voyants sont au vert, l'expert vous présentera une synthèse claire. Si ce n'est pas cohérent, il vous le dira franchement.
+        script("Je vous confirme donc le rendez-vous avec Maurice. Il intervient comme expert thermicien mandaté par le bureau d'études. S'il valide le projet, la société d'installation sera choisie ensuite en fonction des impératifs techniques de votre maison. Si vous avez un imprévu, prévenez-nous simplement, car Maurice organise ses tournées et cela évite de bloquer un créneau inutilement.")
+        commentaire_final = st.text_area("Commentaire final pour Maurice", placeholder="Ex : attention chien, portail, client méfiant, conjoint très important...")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-### Important : ne pas parler comme un installateur
-À éviter : société installatrice, commercial, vendeur, Froid24, démarche gouvernementale, bureau d'étude agréé ANAH si ce n'est pas exactement vrai.
+# -----------------------------
+# LIVE PANEL / SCORE / REPORT
+# -----------------------------
+with col_live:
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.subheader("Score RDV en direct")
+    notes = []
+    score = 0
+    # variables may not exist before tabs render? They do render all.
+    score += add_score(rappel_demande == "Oui", 8, "Reconnaît la demande", notes)
+    score += add_score(humeur in ["Ouvert", "Très ouvert"], 8, "Contact ouvert", notes)
+    score += add_score(owner == "Oui", 10, "Propriétaire", notes)
+    score += add_score(house == "Oui", 8, "Maison individuelle", notes)
+    score += add_score(main_residence == "Oui", 5, "Résidence principale", notes)
+    score += add_score(surface >= 90, 8, "Surface intéressante", notes)
+    score += add_score(chauffage in ["Gaz", "Fioul"], 10, "Chauffage gaz/fioul", notes)
+    score += add_score(age_chaudiere in ["15 à 20 ans", "+20 ans"], 10, "Système ancien", notes)
+    score += add_score(len(motivation.strip()) > 15, 10, "Motivation exprimée", notes)
+    score += add_score(urgence in ["Forte", "Très forte"], 8, "Urgence forte", notes)
+    score += add_score(decision_ready == "Oui", 15, "Prêt à avancer si projet cohérent", notes)
+    score += add_score(deciders_present == "Oui", 10, "Décideurs présents", notes)
+    score += add_score(adresse_ok == "Oui", 5, "Adresse confirmée", notes)
+    score += add_score(mensualite_ok not in ["À confirmer", "Refuse toute mensualité"], 8, "Fourchette de mensualité validée", notes)
+    score += add_score(mail_recu == "Oui", 7, "Mail documents reçu", notes)
 
-À dire : expert/ingénieur mandaté, étude de faisabilité, validation technique et financière, aides publiques existantes, décision éclairée.
+    penalties = []
+    if rappel_demande == "Non":
+        score -= 20; penalties.append("Ne reconnaît pas la demande")
+    if decision_ready == "Non":
+        score -= 25; penalties.append("Refuse l'idée de lancer le projet")
+    if "Veut comparer" in objections:
+        score -= 15; penalties.append("Comparaison active")
+    if deciders_present == "Non":
+        score -= 20; penalties.append("Décideurs absents")
+    if mensualite_ok == "Refuse toute mensualité":
+        score -= 12; penalties.append("Refuse toute mensualité")
+    if rdv_time.hour >= 18:
+        score -= 10; penalties.append("RDV après 18h : plus risqué, surtout familles")
+    if famille_enfants == "Oui" and rdv_time.hour >= 18:
+        score -= 10; penalties.append("Famille avec enfants + RDV tardif")
+    if mail_recu != "Oui":
+        score -= 8; penalties.append("Réception mail documents non confirmée")
+    if owner == "Non" or house == "Non":
+        score -= 30; penalties.append("Critère bloquant possible")
 
-### Questions dans le bon ordre
-1. Vous êtes bien propriétaire ?
-2. C'est bien une maison individuelle ?
-3. C'est votre résidence principale ?
-4. Elle fait environ combien de mètres carrés ?
-5. Vous chauffez avec quoi aujourd'hui ?
-6. Votre chaudière / système a environ quel âge ?
-7. Vous avez des radiateurs à eau ou un plancher chauffant ?
-8. Qu'est-ce qui vous a donné envie de demander des renseignements ?
-9. Qu'est-ce qui vous dérange le plus aujourd'hui ?
-10. Si rien ne change dans deux ans, qu'est-ce qui risque de vous embêter ?
-11. Si on arrivait à régler ça, qu'est-ce que ça changerait pour vous ?
-12. Qui prendra la décision finale si le projet vous convient ?
-13. Si le projet est techniquement faisable, que les aides sont cohérentes et que le budget vous convient, est-ce que vous seriez prêt à avancer ?
-
-### Quand proposer la date et l'heure ?
-La date et l'heure doivent être à la fin.
-
-Pourquoi ? Parce que si tu proposes le rendez-vous trop tôt, le prospect accepte par curiosité. Tu obtiens un rendez-vous, mais pas forcément un rendez-vous closable.
-
-Le bon ordre est :
-Qualification → Motivation → Décideurs → Engagement → Documents → Date/heure.
-
-### Phrase de transparence
-Je préfère être transparent avec vous : nous mandatons un expert uniquement lorsqu'il existe une vraie possibilité que le projet puisse aboutir. De votre côté, je vous demande la même transparence. Si aujourd'hui vous savez déjà que vous ne souhaitez rien changer, dites-le-moi maintenant, cela nous évitera de vous déranger inutilement.
-
-### Confirmation RDV
-Parfait, je vous confirme donc le rendez-vous le [date] à [heure]. Le rendez-vous dure généralement entre 1h30 et 2h. Il faudra que toutes les personnes qui décident soient présentes, sinon l'étude ne sera pas complète.
-
-### Documents
-Préparez si possible : avis d'imposition, taxe foncière, facture d'énergie, pièces d'identité des propriétaires, RIB si le dossier est lancé, et justificatifs de revenus si un financement est envisagé.
-
----
-
-### À ne pas dire
-❌ « Avez-vous déjà fait faire une étude ? »  
-❌ « Vous pourrez comparer. »  
-❌ « Je vous envoie un commercial. »  
-❌ « C'est une démarche gouvernementale » si ce n'est pas juridiquement exact.  
-❌ « Bureau d'étude agréé ANAH » si la société ne l'est pas réellement.  
-❌ « Froid24 » au prospect, sauf si c'est absolument nécessaire ou demandé directement.
-
-### À dire à la place
-✅ « On va vérifier si votre maison mérite réellement cet investissement. »  
-✅ « Je peux demander à Maurice de mandater un expert/ingénieur. »  
-✅ « L'objectif est de valider un projet, pas de vendre systématiquement une pompe à chaleur. »  
-✅ « Si ce n'est pas cohérent, l'expert vous le dira clairement. »  
-✅ « Si tout est cohérent, vous aurez tous les éléments pour décider proprement. »
-""")
-
-with tab3:
-    st.subheader("Rapport à envoyer à Maurice")
-    report = st.session_state.get("last_report", "Aucun rapport généré pour l'instant.")
-    score = st.session_state.get("last_score", None)
-    if score is not None:
-        css = "good" if score >= 75 else "mid" if score >= 55 else "bad"
-        st.markdown(f"<div class='{css}'><b>{quality_label(score)}</b><br>Score : {score}/100</div>", unsafe_allow_html=True)
-    st.text_area("Rapport", value=report, height=500)
-    if report != "Aucun rapport généré pour l'instant.":
-        st.download_button("⬇️ Télécharger le rapport TXT", report, file_name="rapport_rdv_david.txt")
-        mailto = "mailto:?subject=" + quote("Rapport RDV David / Maurice") + "&body=" + quote(report[:1800])
-        whatsapp = "https://wa.me/?text=" + quote(report[:1800])
-        st.markdown(f"[📧 Envoyer par email]({mailto})")
-        st.markdown(f"[💬 Envoyer par WhatsApp]({whatsapp})")
-
-with tab4:
-    st.subheader("Historique de la session")
-    st.warning("L'historique Streamlit est temporaire. Pour ne rien perdre, David doit copier le rapport dans Alltoo et/ou l'envoyer à Maurice après chaque RDV.")
-    if not st.session_state.history:
-        st.write("Aucun RDV enregistré dans cette session.")
+    score = max(0, min(100, score))
+    if score >= 80:
+        color = "#15803d"; verdict = "🟢 Excellent — RDV à prioriser"
+    elif score >= 60:
+        color = "#c2410c"; verdict = "🟠 Moyen — à sécuriser"
     else:
-        for h in reversed(st.session_state.history):
-            st.markdown(f"**{h['nom']}** — {h['date']} {h['heure']} — Score {h['score']}/100")
-            with st.expander("Voir rapport"):
-                st.text(h["rapport"])
+        color = "#b91c1c"; verdict = "🔴 Risqué — attention déplacement inutile"
+
+    st.markdown(f"""
+    <div class='metric-card'>
+      <p class='big' style='color:{color}'>{score}/100</p>
+      <div class='small'>{verdict}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### Points forts")
+    if notes:
+        for pts, label in notes[:8]:
+            st.write(f"✅ {label} (+{pts})")
+    else:
+        st.write("Aucun point fort validé pour l'instant.")
+    if penalties:
+        st.markdown("### Risques")
+        for p in penalties:
+            st.write(f"⚠️ {p}")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # report
+    nom_complet = " ".join([x for x in [civilite if civilite != "À confirmer" else "", prenom, nom] if x]).strip() or "Prospect à compléter"
+    rdv_str = f"{rdv_date.strftime('%d/%m/%Y')} à {rdv_time.strftime('%H:%M')}" if 'rdv_date' in locals() else "À compléter"
+    adresse_full = ", ".join([x for x in [adresse, cp, ville] if x]).strip() or "Adresse à compléter"
+
+    report = f"""📞 RAPPORT RDV POUR MAURICE
+
+⭐ Score : {score}/100 — {verdict}
+
+👤 Prospect : {nom_complet}
+📱 Téléphone : {tel or 'À compléter'}
+✉️ Email : {email or 'À compléter'}
+🏠 Adresse : {adresse_full}
+📅 RDV : {rdv_str}
+⏱ Durée annoncée : {duree}
+👨‍👩‍👧 Famille avec enfants : {famille_enfants}
+
+✅ QUALIFICATION
+- Propriétaire : {owner}
+- Maison individuelle : {house}
+- Résidence principale : {main_residence}
+- Surface : {surface if surface else 'À compléter'} m²
+- Foyer : {occupants if occupants else 'À compléter'} personne(s)
+- Chauffage actuel : {chauffage}
+- Âge système : {age_chaudiere}
+- Eau chaude : {ecs}
+- Émetteurs : {', '.join(emetteurs) if emetteurs else 'À compléter'}
+- Zone climatique : {zone}
+- Revenus estimés : {revenu}
+
+🔥 MOTIVATION CLIENT — MOTS EXACTS
+Pourquoi maintenant : {motivation or 'À compléter'}
+Gêne principale : {gene or 'À compléter'}
+Projection / bénéfice attendu : {projection or 'À compléter'}
+Facture actuelle : {facture or 'À compléter'}
+Fourchette mensualité acceptable : {mensualite_ok}
+Urgence : {urgence}
+
+🧠 ENGAGEMENT / DÉCISION
+Réponse engagement : {decision_ready}
+Décideur(s) : {deciders or 'À compléter'}
+Décideurs présents : {deciders_present}
+Objections : {', '.join(objections) if objections else 'Aucune objection forte détectée'}
+Détails objections : {objection_detail or 'RAS'}
+
+📄 DOCUMENTS À PRÉPARER / ENVOYER
+{', '.join(docs) if docs else 'À compléter'}
+Mail envoyé : {mail_envoye}
+Réception mail confirmée : {mail_recu}
+
+📝 COMMENTAIRE DAVID
+{commentaire_final or 'RAS'}
+"""
+
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.subheader("Rapport prêt à copier dans Alltoo / WhatsApp")
+    st.code(report, language="text")
+    whatsapp_text = quote(report)
+    st.markdown(f"[📲 Ouvrir WhatsApp avec le rapport](https://wa.me/?text={whatsapp_text})")
+    st.download_button("⬇️ Télécharger le rapport TXT", report, file_name=f"rapport_rdv_{prenom or 'prospect'}_{nom or ''}.txt", mime="text/plain", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("---")
+st.caption("Version Maurice Télépro v4 — outil temporaire sans base de données. Sauvegarde recommandée : copier le rapport dans Alltoo après chaque appel.")
