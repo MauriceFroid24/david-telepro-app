@@ -1,22 +1,12 @@
-# Assistant Télépro Énergie — v7 iPad sombre
+# Assistant Télépro Énergie — v8
 
-Version optimisée pour iPad / PC :
+Version sombre corrigée : champs lisibles, barre Streamlit du haut assombrie, navigation latérale, boutons Retour/Suivant, rapport copiable pour Alltoo/CRM.
 
-- mode sombre pour confort et économie d’affichage ;
-- volet de navigation latéral ;
-- boutons Retour / Suivant en bas de page ;
-- projet identifié plus tard, après motivation et logement ;
-- âge de la maison ajouté ;
-- bouton Copier le rapport pour Alltoo / CRM ;
-- rapport final complet ;
-- aucune mention de Maurice ni de Froid24 côté prospect.
+## Déploiement
 
-## Déploiement Streamlit
-
-Remplacer à la racine du dépôt GitHub :
-
-- `app.py`
-- `requirements.txt`
-- `README.md`
+Uploader à la racine du dépôt GitHub :
+- app.py
+- requirements.txt
+- README.md
 
 Puis Streamlit Cloud → Manage app → Reboot / Redeploy.

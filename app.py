@@ -15,27 +15,62 @@ st.markdown(
     """
     <style>
     :root { color-scheme: dark; }
-    .stApp { background: #080c14; color: #eef4ff; }
-    [data-testid="stSidebar"] { background: #0d1422; border-right: 1px solid #1e2a3d; }
-    [data-testid="stSidebar"] * { color: #e6edf7; }
+    .stApp { background: #080c14 !important; color: #eef4ff !important; }
+
+    /* Barre blanche Streamlit du haut */
+    header[data-testid="stHeader"] {
+        background: #080c14 !important;
+        border-bottom: 1px solid #111827 !important;
+    }
+    header[data-testid="stHeader"] * { color: #eaf1ff !important; }
+    [data-testid="stToolbar"] { background: transparent !important; }
+    [data-testid="stDecoration"] { display:none !important; }
+
+    [data-testid="stSidebar"] { background: #0d1422 !important; border-right: 1px solid #1e2a3d; }
+    [data-testid="stSidebar"] * { color: #e6edf7 !important; }
     .block-container {padding-top: 0.8rem; padding-bottom: 1.1rem; max-width: 820px;}
-    h1 {font-size: 1.55rem; margin-bottom: 0.1rem; color:#ffffff;}
-    h2, h3 {margin-top: 0.5rem; color:#ffffff;}
+    h1 {font-size: 1.55rem; margin-bottom: 0.1rem; color:#ffffff !important;}
+    h2, h3, h4, p, label, span, div { color:#eef4ff; }
+    h2, h3 {margin-top: 0.5rem; color:#ffffff !important;}
     .script {
         background:#101a2b; border:1px solid #263753; border-left:5px solid #75a7ff; border-radius:14px;
         padding:13px 15px; margin:10px 0 16px 0; line-height:1.45; color:#eaf1ff;
     }
-    .script b { color:#9fc0ff; }
+    .script b { color:#9fc0ff !important; }
     .ok {background:#0f2a1d; border:1px solid #236a44; color:#bff6d4; border-radius:12px; padding:10px; margin:8px 0;}
     .warn {background:#2d230b; border:1px solid #7d641c; color:#ffe6a3; border-radius:12px; padding:10px; margin:8px 0;}
     .bad {background:#311317; border:1px solid #7d2d37; color:#ffc7cf; border-radius:12px; padding:10px; margin:8px 0;}
     .mini {font-size:.88rem; color:#aeb9ca;}
     div[data-testid="stMetric"] {background:#0d1422; border:1px solid #1e2a3d; border-radius:12px; padding:8px;}
     div[data-testid="stMetric"] * { color:#eef4ff !important; }
-    .stButton > button {width:100%; min-height:2.7rem; border-radius:12px; font-weight:700;}
-    .stDownloadButton > button {width:100%; min-height:2.7rem; border-radius:12px; font-weight:700;}
-    div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] { background:#111a2a; border-radius:10px; }
-    textarea, input { color:#ffffff !important; }
+    .stButton > button {width:100%; min-height:2.7rem; border-radius:12px; font-weight:700; background:#132033 !important; color:#f4f7ff !important; border:1px solid #304461 !important;}
+    .stDownloadButton > button {width:100%; min-height:2.7rem; border-radius:12px; font-weight:700; background:#132033 !important; color:#f4f7ff !important; border:1px solid #304461 !important;}
+
+    /* Champs sombres lisibles */
+    div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] {
+        background:#111a2a !important;
+        border:1px solid #2c3b55 !important;
+        border-radius:10px !important;
+        color:#ffffff !important;
+    }
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div {
+        background:#111a2a !important;
+        color:#ffffff !important;
+    }
+    input, textarea,
+    input[type="text"], input[type="number"], input[type="email"], input[type="tel"] {
+        background:#111a2a !important;
+        color:#ffffff !important;
+        caret-color:#ffffff !important;
+    }
+    input::placeholder, textarea::placeholder { color:#8290a6 !important; opacity:1 !important; }
+    div[data-baseweb="select"] span { color:#ffffff !important; }
+    [data-baseweb="popover"], [data-baseweb="menu"] { background:#111a2a !important; color:#ffffff !important; }
+    [role="option"] { background:#111a2a !important; color:#ffffff !important; }
+    [role="option"]:hover { background:#1b2b45 !important; }
+
     .copy-wrap { margin-top: .3rem; }
     .copy-btn {
         width:100%; padding:13px 16px; border-radius:12px; border:1px solid #477bd3;
