@@ -107,6 +107,12 @@ for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# IMPORTANT STREAMLIT : quand on navigue page par page, Streamlit peut nettoyer
+# les valeurs des widgets qui ne sont plus affichés. Cette ligne "ré-attache"
+# chaque valeur à session_state pour éviter de perdre les informations en changeant de page.
+for k in list(DEFAULTS.keys()):
+    st.session_state[k] = st.session_state.get(k, DEFAULTS[k])
+
 
 def yn(label, key):
     return st.radio(label, ["Oui", "Non", "À confirmer"], key=key, horizontal=True, index=None)
