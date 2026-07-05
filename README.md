@@ -1,24 +1,20 @@
-# Maurice Télépro — v4
+# Assistant Télépro - Projet Énergie v5
 
-Assistant Streamlit temporaire pour guider David pendant les appels et envoyer à Maurice des rendez-vous qualifiés.
+Application Streamlit pour qualifier rapidement les prospects PAC / ITE / Photovoltaïque.
 
 ## Installation Streamlit Cloud
 
-Fichiers à mettre à la racine du dépôt GitHub :
-- app.py
-- requirements.txt
-- README.md
+1. Dézipper le fichier.
+2. Remplacer sur GitHub les fichiers :
+   - `app.py`
+   - `requirements.txt`
+   - `README.md`
+3. Sur Streamlit Cloud : `Manage app` puis `Reboot` ou `Redeploy`.
 
-Puis Streamlit Cloud → Manage app → Reboot/Redeploy.
+## Notes v5
 
-## Nouveautés v4
-
-- Pas de prix cash : uniquement fourchette de mensualités.
-- Ne demande jamais si une première étude a déjà été faite.
-- Maurice est présenté comme expert thermicien, pas commercial.
-- Adresse et date/heure uniquement à la fin.
-- Alerte si zone H2/H3 pour ne pas annoncer de conditions H1.
-- RDV après 18h pénalisé, surtout avec enfants.
-- Documents à préparer/envoyer en PDF ou photos lisibles.
-- Confirmation de réception du mail documents.
-- Rapport enrichi pour Alltoo / WhatsApp.
+- Aucune mention de Maurice dans le script côté prospect.
+- Le rendez-vous est présenté comme l’intervention d’un expert / ingénieur thermicien mandaté.
+- Les champs ne sont pas préremplis : ce qui est vide reste à faire.
+- Différenciation PAC air/eau, PAC air/air, ITE, photovoltaïque, BTD et projet personnalisé.
+- Date, heure et adresse demandées à la fin, après qualification.
