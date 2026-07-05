@@ -1,19 +1,22 @@
-# Assistant Télépro Énergie — Version iPad éco batterie (v6)
+# Assistant Télépro Énergie — v7 iPad sombre
 
-Version optimisée pour iPad / PC : navigation page par page, boutons Retour / Suivant, interface légère, moins de blocs affichés en même temps.
+Version optimisée pour iPad / PC :
 
-## Installation Streamlit Cloud
+- mode sombre pour confort et économie d’affichage ;
+- volet de navigation latéral ;
+- boutons Retour / Suivant en bas de page ;
+- projet identifié plus tard, après motivation et logement ;
+- âge de la maison ajouté ;
+- bouton Copier le rapport pour Alltoo / CRM ;
+- rapport final complet ;
+- aucune mention de Maurice ni de Froid24 côté prospect.
 
-1. Dézipper le fichier.
-2. Remplacer sur GitHub les fichiers :
-   - `app.py`
-   - `requirements.txt`
-   - `README.md`
-3. Vérifier que les fichiers sont à la racine du dépôt GitHub.
-4. Sur Streamlit Cloud : `Manage app` → `Reboot` ou `Redeploy`.
+## Déploiement Streamlit
 
-## Utilisation
+Remplacer à la racine du dépôt GitHub :
 
-David suit les pages dans l’ordre : contact, projet, logement, motivation, engagement, décideurs/RDV, documents, rapport.
+- `app.py`
+- `requirements.txt`
+- `README.md`
 
-Les champs restent vides tant qu’ils ne sont pas complétés, ce qui permet de voir rapidement ce qui reste à faire.
+Puis Streamlit Cloud → Manage app → Reboot / Redeploy.
