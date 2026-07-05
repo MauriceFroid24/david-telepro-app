@@ -2,12 +2,15 @@ import streamlit as st
 from datetime import datetime, date, time
 from urllib.parse import quote
 
-st.set_page_config(page_title="Assistant Télépro David", page_icon="📞", layout="wide")
+st.set_page_config(page_title="Maurice Qualification Télépro", page_icon="📞", layout="wide")
 
 st.markdown("""
 <style>
 .block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
-.big-card {background: #f7f7f9; padding: 18px; border-radius: 16px; border: 1px solid #e6e6ea;}
+.big-card {background: #f7f7f9; padding: 18px; border-radius: 16px; border: 1px solid #e6e6ea; margin-bottom: 12px;}
+.script {background:#ffffff;padding:14px;border-radius:14px;border:1px solid #dedee6;margin:8px 0;}
+.say {background:#eef3ff;padding:12px;border-radius:12px;border-left:5px solid #3467eb;margin:8px 0;}
+.warning {background:#fff4e5;padding:12px;border-radius:12px;border-left:5px solid #ff9900;margin:8px 0;}
 .good {background:#e9f8ef;padding:12px;border-radius:12px;border-left:5px solid #19a35b;}
 .mid {background:#fff6e6;padding:12px;border-radius:12px;border-left:5px solid #f0a000;}
 .bad {background:#fdecec;padding:12px;border-radius:12px;border-left:5px solid #d93636;}
@@ -21,10 +24,15 @@ if "history" not in st.session_state:
 def yesno(label, key):
     return st.radio(label, ["Oui", "Non", "Je ne sais pas"], horizontal=True, key=key)
 
+def say(text):
+    st.markdown(f"<div class='say'><b>Phrase à dire :</b><br>{text}</div>", unsafe_allow_html=True)
+
+def tip(text):
+    st.markdown(f"<div class='warning'><b>Conseil Maurice :</b><br>{text}</div>", unsafe_allow_html=True)
+
 def score_lead(d):
     score = 0
     reasons = []
-    # Base qualification
     for field, points, label in [
         ("proprietaire", 12, "propriétaire"),
         ("maison", 10, "maison individuelle"),
@@ -36,7 +44,6 @@ def score_lead(d):
             score += points; reasons.append(f"+{points} {label}")
         elif d.get(field) == "Non":
             score -= points; reasons.append(f"-{points} {label} absent")
-    # Heating
     chauffage = d.get("chauffage", "")
     if chauffage in ["Gaz", "Fioul"]:
         score += 12; reasons.append("+12 chauffage gaz/fioul")
@@ -68,7 +75,6 @@ def score_lead(d):
             score += 6; reasons.append("+6 facture significative")
     except Exception:
         pass
-    # Motivation
     motivation = d.get("motivation_note", 0)
     score += int(motivation) * 3
     reasons.append(f"+{int(motivation)*3} motivation {motivation}/10")
@@ -79,7 +85,6 @@ def score_lead(d):
         score -= 35; reasons.append("-35 pas prêt à avancer")
     else:
         score -= 10; reasons.append("-10 engagement flou")
-    # Red flags
     reds = d.get("red_flags", [])
     red_penalties = {
         "Veut juste comparer": -25,
@@ -89,6 +94,7 @@ def score_lead(d):
         "Cherche uniquement le prix": -15,
         "Méfiance forte / arnaque": -10,
         "Pas de disponibilité réelle": -25,
+        "Demande déjà plusieurs études": -20,
     }
     for r in reds:
         score += red_penalties.get(r, 0)
@@ -105,7 +111,7 @@ def quality_label(score):
 def build_report(d, score, reasons):
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     lines = []
-    lines.append(f"RAPPORT RDV TÉLÉPRO - DAVID")
+    lines.append("RAPPORT RDV TÉLÉPRO - DAVID / MAURICE")
     lines.append(f"Créé le : {now}")
     lines.append("")
     lines.append(f"Score : {score}/100 - {quality_label(score)}")
@@ -114,7 +120,7 @@ def build_report(d, score, reasons):
     lines.append(f"Prospect : {d.get('civilite','')} {d.get('nom','')}")
     lines.append(f"Téléphone : {d.get('telephone','')}")
     lines.append(f"Adresse : {d.get('adresse','')} {d.get('cp','')} {d.get('ville','')}")
-    lines.append(f"RDV : {d.get('rdv_date','')} à {d.get('rdv_time','')}")
+    lines.append(f"RDV expert/ingénieur : {d.get('rdv_date','')} à {d.get('rdv_time','')}")
     lines.append("")
     lines.append("QUALIFICATION")
     lines.append(f"Propriétaire : {d.get('proprietaire','')}")
@@ -122,7 +128,7 @@ def build_report(d, score, reasons):
     lines.append(f"Résidence principale : {d.get('res_principale','')}")
     lines.append(f"Surface : {d.get('surface','')} m²")
     lines.append(f"Chauffage actuel : {d.get('chauffage','')}")
-    lines.append(f"Âge chaudière : {d.get('age_chaudiere','')} ans")
+    lines.append(f"Âge chaudière / système : {d.get('age_chaudiere','')} ans")
     lines.append(f"ECS : {d.get('ecs','')}")
     lines.append(f"Émetteurs : {d.get('emetteurs','')}")
     lines.append(f"Facture énergie : environ {d.get('facture','')} €/mois")
@@ -153,15 +159,18 @@ def build_report(d, score, reasons):
     lines.extend(reasons)
     return "\n".join(lines)
 
-st.title("📞 Assistant Télépro David — Qualification RDV closable")
-st.caption("Objectif : protéger le temps terrain, éviter les faux RDV et envoyer à Simon un maximum d’informations utiles.")
+st.title("📞 Maurice — Assistant Télépro David")
+st.caption("Objectif : qualifier des RDV closables, protéger les kilomètres terrain, et transmettre un maximum d’informations utiles à Maurice.")
 
 tab1, tab2, tab3, tab4 = st.tabs(["1. Appel guidé", "2. Déballe / Conseils", "3. Rapport", "4. Historique"])
 
 with tab1:
     st.subheader("Appel guidé")
-    st.info("Règle d'or : David ne prend pas un RDV, il vérifie si le déplacement de Simon mérite d'être fait.")
+    st.info("Règle d'or : David ne vend pas une PAC et n'annonce pas un commercial. Il vérifie si le projet mérite de mandater un expert/ingénieur à domicile.")
     with st.form("lead_form"):
+        st.markdown("### A) Identification rapide")
+        say("Bonjour Monsieur / Madame [Nom], David à l'appareil. Je vous appelle suite à votre demande d'informations concernant les solutions pour réduire votre consommation d'énergie dans votre logement. Je vais simplement vérifier quelques points pour savoir si ça vaut réellement la peine de mandater un expert/ingénieur à votre domicile.")
+        tip("Ne jamais dire Froid24. Ne jamais dire installateur. Ne jamais dire commercial. Dire : expert, ingénieur, spécialiste projet ou conseiller technique.")
         c1, c2, c3 = st.columns(3)
         with c1:
             civilite = st.selectbox("Civilité", ["Monsieur", "Madame", "Monsieur et Madame", ""])
@@ -172,56 +181,66 @@ with tab1:
             cp = st.text_input("Code postal")
             ville = st.text_input("Ville")
         with c3:
-            rdv_date = st.date_input("Date RDV", value=date.today())
-            rdv_time = st.time_input("Heure RDV", value=time(10, 0))
-            source = st.text_input("Source lead / campagne", value="Froid24")
+            source = st.text_input("Source lead / campagne interne", value="Lead énergie")
+            canal = st.selectbox("Thématique lead", ["PAC", "ITE", "Panneaux photovoltaïques", "Énergie / non précisé"])
 
-        st.markdown("### 1) Qualification logement")
+        st.markdown("### B) Qualification logement")
+        say("Avant de parler de rendez-vous, j’ai besoin de vérifier que votre logement rentre bien dans le cadre d’une étude sérieuse. Si ce n’est pas cohérent, je préfère vous le dire tout de suite plutôt que de vous faire perdre du temps.")
         q1, q2, q3 = st.columns(3)
         with q1:
-            proprietaire = yesno("Propriétaire ?", "prop")
+            proprietaire = yesno("Vous êtes bien propriétaire ?", "prop")
         with q2:
-            maison = yesno("Maison individuelle ?", "maison")
+            maison = yesno("C’est bien une maison individuelle ?", "maison")
         with q3:
-            res_principale = yesno("Résidence principale ?", "res")
+            res_principale = yesno("C’est votre résidence principale ?", "res")
         q4, q5, q6 = st.columns(3)
         with q4:
-            surface = st.number_input("Surface environ (m²)", min_value=0, max_value=500, value=100, step=5)
+            surface = st.number_input("Elle fait environ combien de m² ?", min_value=0, max_value=500, value=100, step=5)
         with q5:
-            chauffage = st.selectbox("Chauffage actuel", ["Gaz", "Fioul", "Électrique", "Bois", "PAC existante", "Autre", "Je ne sais pas"])
+            chauffage = st.selectbox("Aujourd’hui vous chauffez avec quoi ?", ["Gaz", "Fioul", "Électrique", "Bois", "PAC existante", "Autre", "Je ne sais pas"])
         with q6:
-            age_chaudiere = st.number_input("Âge chaudière / système", min_value=0, max_value=60, value=15)
+            age_chaudiere = st.number_input("Votre chaudière / système a environ quel âge ?", min_value=0, max_value=60, value=15)
         q7, q8, q9 = st.columns(3)
         with q7:
-            ecs = st.selectbox("Eau chaude", ["Chaudière", "Ballon électrique", "Ballon thermodynamique", "Autre", "Je ne sais pas"])
+            ecs = st.selectbox("L’eau chaude est produite comment ?", ["Chaudière", "Ballon électrique", "Ballon thermodynamique", "Autre", "Je ne sais pas"])
         with q8:
-            emetteurs = st.selectbox("Émetteurs", ["Radiateurs à eau", "Plancher chauffant", "Radiateurs électriques", "Mixte", "Je ne sais pas"])
+            emetteurs = st.selectbox("Vous avez des radiateurs à eau ou plancher chauffant ?", ["Radiateurs à eau", "Plancher chauffant", "Radiateurs électriques", "Mixte", "Je ne sais pas"])
             radiateurs_eau = "Oui" if emetteurs in ["Radiateurs à eau", "Plancher chauffant", "Mixte"] else "Non"
         with q9:
             facture = st.number_input("Facture énergie estimée €/mois", min_value=0, max_value=1000, value=150, step=10)
 
-        st.markdown("### 2) Motivation réelle")
+        st.markdown("### C) Motivation réelle")
+        say("Je veux comprendre ce qui vous a fait faire la demande, parce qu’on ne déplace pas un expert pour une simple curiosité. L’objectif est de voir s’il y a un vrai sujet à régler chez vous.")
         declencheur = st.text_area("Qu'est-ce qui vous a donné envie de demander des renseignements ?", height=70)
-        gene = st.text_area("Qu'est-ce qui vous dérange le plus aujourd'hui ?", height=70)
+        gene = st.text_area("Qu'est-ce qui vous dérange le plus aujourd'hui avec votre chauffage / vos factures ?", height=70)
         risque = st.text_area("Si rien ne change dans 2 ans, qu'est-ce qui risque de vous embêter ?", height=70)
         changement = st.text_area("Si on arrivait à régler ça, qu'est-ce que ça changerait pour vous ?", height=70)
-        motivation_note = st.slider("Motivation réelle du prospect", 1, 10, 7)
+        motivation_note = st.slider("Sur 10, à quel point vous voulez réellement trouver une solution ?", 1, 10, 7)
 
-        st.markdown("### 3) Décision et engagement")
-        decideur = st.text_input("Qui prend la décision finale ?")
-        decideurs_presents = yesno("Tous les décideurs seront présents au RDV ?", "decideurs")
+        st.markdown("### D) Décision et engagement")
+        say("Je préfère vous poser la question clairement : si l’étude montre que c’est techniquement faisable, que les aides sont cohérentes et que le budget vous convient, est-ce que vous seriez prêt à avancer sur le projet ?")
+        decideur = st.text_input("Qui prendra la décision finale si le projet convient ?")
+        decideurs_presents = yesno("Toutes les personnes qui décident seront présentes ?", "decideurs")
         pret_si_ok = yesno("Si technique + aides + budget sont OK, prêt à lancer le projet ?", "pret")
         blocage = st.text_area("Qu'est-ce qui pourrait vous empêcher d'aller au bout ?", height=70)
+        tip("Ne pas demander : 'Avez-vous déjà fait faire une étude ?'. Ça installe l’idée de comparer. Si le prospect parle de comparaison, noter l’alerte et répondre : 'Je comprends, justement l’objectif de notre étude est de vous donner une vision complète et vérifiable pour prendre une décision proprement.'")
 
-        st.markdown("### 4) Documents et alertes")
+        st.markdown("### E) Rendez-vous expert / ingénieur")
+        say("Très bien. Vu les éléments que vous me donnez, je peux demander à Maurice de mandater un expert/ingénieur pour venir vérifier la faisabilité technique, les aides et l’intérêt réel du projet. Ce n’est pas une visite commerciale classique : l’objectif est de valider si le projet mérite d’être lancé ou non.")
+        rdv_date = st.date_input("Date du rendez-vous", value=date.today())
+        rdv_time = st.time_input("Heure du rendez-vous", value=time(10, 0))
+        tip("Oui, la date et l’heure doivent plutôt venir à la fin, après qualification + motivation + décideurs + engagement. On peut noter une disponibilité plus tôt, mais on ne confirme qu’à la fin.")
+
+        st.markdown("### F) Documents et alertes")
+        say("Pour que l’expert puisse calculer les aides correctement et éviter un second passage, préparez si possible les documents suivants. Il vérifiera sur place ce qui est réellement utile.")
         docs = st.multiselect("Documents que le client peut préparer", [
             "Avis d'imposition", "Taxe foncière", "Facture énergie", "Pièces d'identité propriétaires", "RIB", "Bulletins de salaire / justificatifs revenus"
         ])
         red_flags = st.multiselect("Alertes / risques", [
-            "Veut juste comparer", "Décideur absent", "Projet dans plus de 12 mois", "Ne veut rien changer",
+            "Veut juste comparer", "Demande déjà plusieurs études", "Décideur absent", "Projet dans plus de 12 mois", "Ne veut rien changer",
             "Cherche uniquement le prix", "Méfiance forte / arnaque", "Pas de disponibilité réelle"
         ])
-        notes_exactes = st.text_area("Phrases exactes du client à transmettre à Simon", height=130)
+        notes_exactes = st.text_area("Phrases exactes du client à transmettre à Maurice", height=130)
         submitted = st.form_submit_button("✅ Générer le rapport")
 
     if submitted:
@@ -239,28 +258,47 @@ with tab2:
     st.subheader("Déballe recommandée")
     st.markdown("""
 ### Ouverture
-Bonjour Monsieur / Madame [Nom], David à l'appareil. Je vous appelle concernant votre demande d'informations sur les solutions permettant de réduire votre consommation de chauffage.
+Bonjour Monsieur / Madame [Nom], David à l'appareil. Je vous appelle suite à votre demande d'informations concernant les solutions pour réduire votre consommation d'énergie dans votre logement.
 
-J'ai simplement besoin de vérifier quelques éléments pour savoir si cela vaut vraiment la peine de déplacer un conseiller chez vous. Si je vois que le projet n'est pas pertinent, je préfère vous le dire maintenant plutôt que vous faire perdre deux heures. Est-ce que vous avez deux minutes ?
+Je vais simplement vérifier quelques points pour savoir si ça vaut réellement la peine de mandater un expert/ingénieur à votre domicile.
 
-### Posture
-Notre rôle n'est pas de remplacer systématiquement les chaudières. Le but est d'abord de vérifier si votre maison mérite réellement cet investissement : technique, aides, budget et économies.
+Si je vois que ce n'est pas pertinent, je préfère vous le dire maintenant plutôt que de vous faire perdre du temps. Est-ce que vous avez deux minutes ?
 
-### Questions à poser
-1. Vous êtes bien propriétaire de la maison ?
-2. C'est votre résidence principale ?
-3. Vous chauffez avec quoi aujourd'hui ? Gaz, fioul, autre ?
-4. Votre chaudière a environ quel âge ?
-5. Vous avez des radiateurs à eau ou un plancher chauffant ?
-6. Qu'est-ce qui vous a donné envie de demander des renseignements ?
-7. Qu'est-ce qui vous dérange le plus aujourd'hui ?
-8. Si rien ne change dans deux ans, qu'est-ce qui risque de vous embêter ?
-9. Si on arrivait à régler ça, qu'est-ce que ça changerait pour vous ?
-10. Qui prendra la décision finale si le projet vous convient ?
-11. Si le projet est techniquement faisable, que les aides sont bien présentes et que le budget vous convient, est-ce que vous seriez prêt à lancer le projet ?
+### Positionnement
+Notre rôle n'est pas de remplacer systématiquement les chaudières. L'objectif est d'abord de vérifier si votre maison mérite réellement cet investissement : faisabilité technique, aides, budget et économies.
+
+Si tous les voyants sont au vert, l'expert vous présentera une synthèse claire. Si ce n'est pas cohérent, il vous le dira franchement.
+
+### Important : ne pas parler comme un installateur
+À éviter : société installatrice, commercial, vendeur, Froid24, démarche gouvernementale, bureau d'étude agréé ANAH si ce n'est pas exactement vrai.
+
+À dire : expert/ingénieur mandaté, étude de faisabilité, validation technique et financière, aides publiques existantes, décision éclairée.
+
+### Questions dans le bon ordre
+1. Vous êtes bien propriétaire ?
+2. C'est bien une maison individuelle ?
+3. C'est votre résidence principale ?
+4. Elle fait environ combien de mètres carrés ?
+5. Vous chauffez avec quoi aujourd'hui ?
+6. Votre chaudière / système a environ quel âge ?
+7. Vous avez des radiateurs à eau ou un plancher chauffant ?
+8. Qu'est-ce qui vous a donné envie de demander des renseignements ?
+9. Qu'est-ce qui vous dérange le plus aujourd'hui ?
+10. Si rien ne change dans deux ans, qu'est-ce qui risque de vous embêter ?
+11. Si on arrivait à régler ça, qu'est-ce que ça changerait pour vous ?
+12. Qui prendra la décision finale si le projet vous convient ?
+13. Si le projet est techniquement faisable, que les aides sont cohérentes et que le budget vous convient, est-ce que vous seriez prêt à avancer ?
+
+### Quand proposer la date et l'heure ?
+La date et l'heure doivent être à la fin.
+
+Pourquoi ? Parce que si tu proposes le rendez-vous trop tôt, le prospect accepte par curiosité. Tu obtiens un rendez-vous, mais pas forcément un rendez-vous closable.
+
+Le bon ordre est :
+Qualification → Motivation → Décideurs → Engagement → Documents → Date/heure.
 
 ### Phrase de transparence
-Je préfère être transparent avec vous : le conseiller se déplace uniquement lorsqu'il pense qu'il existe une vraie possibilité que le projet puisse aboutir. De votre côté, je vous demande la même transparence. Si aujourd'hui vous savez déjà que vous ne souhaitez rien changer, dites-le-moi maintenant, cela nous évitera de vous déranger inutilement.
+Je préfère être transparent avec vous : nous mandatons un expert uniquement lorsqu'il existe une vraie possibilité que le projet puisse aboutir. De votre côté, je vous demande la même transparence. Si aujourd'hui vous savez déjà que vous ne souhaitez rien changer, dites-le-moi maintenant, cela nous évitera de vous déranger inutilement.
 
 ### Confirmation RDV
 Parfait, je vous confirme donc le rendez-vous le [date] à [heure]. Le rendez-vous dure généralement entre 1h30 et 2h. Il faudra que toutes les personnes qui décident soient présentes, sinon l'étude ne sera pas complète.
@@ -274,19 +312,20 @@ Préparez si possible : avis d'imposition, taxe foncière, facture d'énergie, p
 ❌ « Avez-vous déjà fait faire une étude ? »  
 ❌ « Vous pourrez comparer. »  
 ❌ « Je vous envoie un commercial. »  
-❌ « Vous n'êtes engagé à rien. »  
 ❌ « C'est une démarche gouvernementale » si ce n'est pas juridiquement exact.  
-❌ « Bureau d'étude agréé ANAH » si la société ne l'est pas réellement.
+❌ « Bureau d'étude agréé ANAH » si la société ne l'est pas réellement.  
+❌ « Froid24 » au prospect, sauf si c'est absolument nécessaire ou demandé directement.
 
 ### À dire à la place
 ✅ « On va vérifier si votre maison mérite réellement cet investissement. »  
-✅ « Le conseiller vient valider un projet, pas vendre systématiquement une pompe à chaleur. »  
-✅ « Si ce n'est pas cohérent, il vous le dira clairement. »  
-✅ « Si tout est cohérent, vous aurez tous les éléments pour décider. »
+✅ « Je peux demander à Maurice de mandater un expert/ingénieur. »  
+✅ « L'objectif est de valider un projet, pas de vendre systématiquement une pompe à chaleur. »  
+✅ « Si ce n'est pas cohérent, l'expert vous le dira clairement. »  
+✅ « Si tout est cohérent, vous aurez tous les éléments pour décider proprement. »
 """)
 
 with tab3:
-    st.subheader("Rapport à envoyer à Simon")
+    st.subheader("Rapport à envoyer à Maurice")
     report = st.session_state.get("last_report", "Aucun rapport généré pour l'instant.")
     score = st.session_state.get("last_score", None)
     if score is not None:
@@ -295,13 +334,14 @@ with tab3:
     st.text_area("Rapport", value=report, height=500)
     if report != "Aucun rapport généré pour l'instant.":
         st.download_button("⬇️ Télécharger le rapport TXT", report, file_name="rapport_rdv_david.txt")
-        mailto = "mailto:?subject=" + quote("Rapport RDV David") + "&body=" + quote(report[:1800])
+        mailto = "mailto:?subject=" + quote("Rapport RDV David / Maurice") + "&body=" + quote(report[:1800])
         whatsapp = "https://wa.me/?text=" + quote(report[:1800])
         st.markdown(f"[📧 Envoyer par email]({mailto})")
         st.markdown(f"[💬 Envoyer par WhatsApp]({whatsapp})")
 
 with tab4:
     st.subheader("Historique de la session")
+    st.warning("L'historique Streamlit est temporaire. Pour ne rien perdre, David doit copier le rapport dans Alltoo et/ou l'envoyer à Maurice après chaque RDV.")
     if not st.session_state.history:
         st.write("Aucun RDV enregistré dans cette session.")
     else:
