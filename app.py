@@ -91,6 +91,7 @@ DEFAULTS = {
     "proprietaire": None, "maison_ind": None, "res_principale": None,
     "surface": None, "age_maison": None, "cp": "", "ville": "", "adresse": "",
     "zone": None, "foyer": None, "rfr": "",
+    "situation_mr": None, "situation_mme": None, "revenus_mensuels": None, "age_mr": None, "age_mme": None,
     "chauffage": "", "age_chaudiere": None, "ecs": "", "emetteurs": "",
     "facture": "", "fonctionne": None,
     "declencheur": "", "gene": "", "changement": "", "urgence": None,
@@ -165,7 +166,11 @@ def missing_items():
     checks = [
         ("Prénom", st.session_state.prenom), ("Nom", st.session_state.nom), ("Téléphone", st.session_state.telephone),
         ("Code postal", st.session_state.cp), ("Ville", st.session_state.ville),
-        ("Zone", st.session_state.zone), ("Propriétaire", st.session_state.proprietaire),
+        ("Zone", st.session_state.zone),
+        ("Situation professionnelle Mr/Mme", st.session_state.situation_mr or st.session_state.situation_mme),
+        ("Revenus mensuels", st.session_state.revenus_mensuels),
+        ("Âge Mr/Mme", st.session_state.age_mr or st.session_state.age_mme),
+        ("Propriétaire", st.session_state.proprietaire),
         ("Maison individuelle", st.session_state.maison_ind), ("Résidence principale", st.session_state.res_principale),
         ("Surface", st.session_state.surface), ("Âge de la maison", st.session_state.age_maison),
         ("Chauffage actuel", st.session_state.chauffage), ("Âge système", st.session_state.age_chaudiere),
@@ -216,6 +221,11 @@ Surface : {st.session_state.surface or 'Non renseignée'} m²
 Âge de la maison : {st.session_state.age_maison or 'Non renseigné'} ans
 Foyer : {st.session_state.foyer or 'Non renseigné'} personnes
 RFR : {st.session_state.rfr or 'Non renseigné'}
+Situation professionnelle Monsieur : {st.session_state.situation_mr or 'Non renseignée'}
+Situation professionnelle Madame : {st.session_state.situation_mme or 'Non renseignée'}
+Revenus mensuels du foyer : {st.session_state.revenus_mensuels or 'Non renseignés'} €
+Âge Monsieur : {st.session_state.age_mr or 'Non renseigné'} ans
+Âge Madame : {st.session_state.age_mme or 'Non renseigné'} ans
 
 INSTALLATION ACTUELLE
 Chauffage : {st.session_state.chauffage or 'Non renseigné'}
@@ -336,6 +346,16 @@ elif page == 1:
         box("Ne pas annoncer les conditions H1 si la zone est H2/H3 ou incertaine. Dire que l’expert vérifiera les aides exactes.", "warn")
     st.number_input("Nombre de personnes au foyer", min_value=0, max_value=12, step=1, key="foyer", value=None)
     st.text_input("Revenu fiscal de référence si connu", key="rfr", placeholder="Ne pas bloquer si le client ne sait pas")
+    st.markdown("#### Situation du foyer")
+    st.selectbox("Situation professionnelle Monsieur", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraité depuis moins de 2 ans", "Retraité depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mr", format_func=lambda x: "Sélectionner" if x is None else x)
+    st.selectbox("Situation professionnelle Madame", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraitée depuis moins de 2 ans", "Retraitée depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mme", format_func=lambda x: "Sélectionner" if x is None else x)
+    st.number_input("Revenus mensuels du foyer (€)", min_value=0, max_value=30000, step=100, key="revenus_mensuels", value=None, placeholder="Ex : 3200")
+    c_age1, c_age2 = st.columns(2)
+    with c_age1:
+        st.number_input("Âge de Monsieur", min_value=0, max_value=110, step=1, key="age_mr", value=None)
+    with c_age2:
+        st.number_input("Âge de Madame", min_value=0, max_value=110, step=1, key="age_mme", value=None)
+    box("Financement : si contrat de travail, demander seulement la dernière fiche de paie. Si retraité depuis moins de 2 ans, demander l’attestation de retraite. Ne pas surcharger le client avec des documents inutiles.", "ok")
     st.text_input("Chauffage actuel", key="chauffage", placeholder="Gaz, fioul, électrique...")
     st.number_input("Âge chaudière / système actuel", min_value=0, max_value=60, step=1, key="age_chaudiere", value=None)
     yn("Le système fonctionne encore correctement ?", "fonctionne")
@@ -400,7 +420,7 @@ elif page == 6:
     - facture énergie récente ;
     - pièces d’identité des propriétaires ;
     - RIB si dossier lancé ;
-    - justificatifs de revenus si financement envisagé.
+    - si financement envisagé : dernière fiche de paie si contrat de travail ; attestation de retraite si retraité depuis moins de 2 ans.
     """)
     box("Phrase : “Je reste avec vous quelques secondes, pouvez-vous me confirmer que vous avez bien reçu le mail avec la liste des documents ?”", "ok")
 
