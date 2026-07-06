@@ -100,7 +100,7 @@ DEFAULTS = {
     "decideurs": "", "tous_presents": None, "creneau_ok": None,
     "date_rdv": None, "heure_rdv": None, "duree": None,
     "docs_prets": None, "mail_docs": None, "mail_recu": None,
-    "notes": "", "statut": None,
+    "notes_perso": "", "notes": "", "statut": None,
     "page": 0,
 }
 
@@ -271,6 +271,9 @@ POINTS DE VIGILANCE
 CE QUI RESTE À COMPLÉTER
 - {(chr(10)+'- ').join(missing) if missing else 'Tout est complet'}
 
+NOTES PERSO PERMANENTES
+{st.session_state.notes_perso or 'Aucune note perso'}
+
 NOTES BRUTES DAVID
 {st.session_state.notes or 'Aucune note'}
 """
@@ -298,6 +301,14 @@ with st.sidebar:
     st.divider()
     st.metric("Score", f"{score}/100")
     st.metric("À compléter", len(missing))
+    st.markdown("### 📝 Note perso")
+    st.text_area(
+        "Visible sur toutes les pages",
+        key="notes_perso",
+        height=180,
+        placeholder="Remarques client, objection importante, détail à ne pas oublier..."
+    )
+    st.caption("Cette note reste affichée pendant tout l’appel et sera reprise dans le rapport final.")
     if st.button("🆕 Nouveau lead"):
         reset_all()
         st.rerun()
@@ -426,6 +437,8 @@ elif page == 6:
 
 elif page == 7:
     st.selectbox("Statut final du lead", [None, "RDV validé", "RDV à confirmer", "À rappeler", "Non closable", "Hors critères"], key="statut", format_func=lambda x: "Sélectionner" if x is None else x)
+    st.markdown("#### Note perso permanente")
+    st.info(st.session_state.notes_perso or "Aucune note perso permanente saisie dans le volet de gauche.")
     st.text_area("Notes libres pendant l’appel", key="notes", placeholder="Mots exacts du client, objections, ambiance, détails utiles terrain...", height=110)
     report = generate_report()
     if score >= 80:

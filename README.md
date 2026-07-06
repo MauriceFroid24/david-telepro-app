@@ -1,9 +1,12 @@
-# Assistant Télépro Énergie - v10
+# Assistant Télépro Énergie - v11
 
-Version Streamlit optimisée iPad/PC avec navigation sombre, rapport CRM et champs foyer/financement ajoutés.
+Version v11 : ajout d'une note perso permanente visible dans le volet de gauche sur toutes les pages.
 
-## Installation Streamlit Cloud
+## Installation
 
-1. Remplacer `app.py`, `requirements.txt` et `README.md` sur GitHub.
-2. Redéployer l’application sur Streamlit Cloud.
-3. Ouvrir le lien sur iPad ou PC.
+Remplacer sur GitHub :
+- app.py
+- requirements.txt
+- README.md
+
+Puis Streamlit Cloud : Manage app -> Redeploy / Reboot.
