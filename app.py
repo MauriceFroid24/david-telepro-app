@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 import html
+from urllib.parse import quote_plus
 import streamlit.components.v1 as components
 
 st.set_page_config(
@@ -114,12 +115,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-APP_VERSION = "v0.14.0"
-APP_VERSION_LABEL = "Version 14"
+APP_VERSION = "v0.15.0"
+APP_VERSION_LABEL = "Version 15"
 APP_UPDATED_AT = "09/07/2026"
 
 PAGES = [
-    "Contact", "Logement", "Motivation", "Projet", "Engagement", "Décideurs & RDV", "Documents", "Rapport"
+    "Contact", "Logement", "Motivation", "Projet", "Engagement", "Décideurs & RDV", "Vérification RDV", "Documents", "Rapport"
 ]
 
 DEFAULTS = {
@@ -136,6 +137,7 @@ DEFAULTS = {
     "decideurs": "", "tous_presents": None, "creneau_ok": None,
     "date_rdv": None, "heure_rdv": None, "duree": None,
     "docs_prets": None, "mail_docs": None, "mail_recu": None,
+    "adresse_maps": None, "streetview_ok": None, "maison_visible": None, "coherence_visuelle": None, "detail_visuel": "", "question_verif": "", "reponse_verif": "", "rdv_reel": None,
     "notes_perso": "", "notes": "", "statut": None,
     "page": 0,
 }
@@ -224,6 +226,18 @@ def half_hour_options():
     return out
 
 
+def full_address_query():
+    parts = [st.session_state.get("adresse", ""), st.session_state.get("cp", ""), st.session_state.get("ville", "")]
+    return " ".join([str(x).strip() for x in parts if str(x).strip()])
+
+def maps_url():
+    q = quote_plus(full_address_query())
+    return f"https://www.google.com/maps/search/?api=1&query={q}" if q else None
+
+def streetview_url():
+    q = quote_plus(full_address_query())
+    return f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={q}" if q else None
+
 def project_label():
     parts = list(st.session_state.projets or [])
     if st.session_state.projet_autre.strip():
@@ -250,6 +264,14 @@ def compute_score():
     elif st.session_state.pret_lancer == "Non": score -= 30; minus.append("pas prêt à lancer")
     if st.session_state.tous_presents == "Oui": score += 16; plus.append("décideurs présents")
     elif st.session_state.tous_presents == "Non": score -= 35; minus.append("décideurs absents")
+    if st.session_state.adresse_maps == "Oui": score += 12; plus.append("adresse vérifiée sur Maps")
+    elif st.session_state.adresse_maps == "Non": score -= 45; minus.append("adresse non trouvée")
+    if st.session_state.maison_visible == "Oui": score += 8; plus.append("maison visible")
+    elif st.session_state.maison_visible == "Non": score -= 20; minus.append("maison non visible / doute")
+    if st.session_state.coherence_visuelle == "Oui": score += 12; plus.append("cohérence visuelle validée")
+    elif st.session_state.coherence_visuelle == "Non": score -= 35; minus.append("incohérence visuelle")
+    if st.session_state.rdv_reel == "Oui": score += 15; plus.append("déplacement validé comme réel")
+    elif st.session_state.rdv_reel == "Non": score -= 50; minus.append("risque fort de faux RDV")
     if st.session_state.docs_prets == "Oui": score += 7; plus.append("documents prêts")
     if st.session_state.mail_recu == "Oui": score += 5; plus.append("mail documents confirmé")
     hr = parse_hour(st.session_state.heure_rdv)
@@ -276,6 +298,9 @@ def missing_items():
         ("Engagement", st.session_state.pret_lancer), ("Décideurs", st.session_state.decideurs),
         ("Tous décideurs présents", st.session_state.tous_presents), ("Adresse complète", st.session_state.adresse),
         ("Date RDV", st.session_state.date_rdv), ("Heure RDV", st.session_state.heure_rdv),
+        ("Adresse vérifiée sur Maps", st.session_state.adresse_maps),
+        ("Cohérence visuelle RDV", st.session_state.coherence_visuelle),
+        ("RDV réel / déplacement validé", st.session_state.rdv_reel),
         ("Documents", st.session_state.docs_prets), ("Mail documents reçu", st.session_state.mail_recu),
     ]
     return [label for label, val in checks if not done(val)]
@@ -393,6 +418,17 @@ def generate_report():
         ("Durée annoncée", st.session_state.duree, ""),
     ])
 
+    add_section(lines, "VÉRIFICATION RDV RÉEL / COHÉRENCE", [
+        ("Adresse trouvée sur Maps", st.session_state.adresse_maps, ""),
+        ("Street View / vue disponible", st.session_state.streetview_ok, ""),
+        ("Maison visible", st.session_state.maison_visible, ""),
+        ("Cohérence visuelle", st.session_state.coherence_visuelle, ""),
+        ("Élément visuel contrôlé", st.session_state.detail_visuel, ""),
+        ("Question posée", st.session_state.question_verif, ""),
+        ("Réponse client", st.session_state.reponse_verif, ""),
+        ("Déplacement validé", st.session_state.rdv_reel, ""),
+    ])
+
     add_section(lines, "DOCUMENTS", [
         ("Documents prêts ou envoyables", st.session_state.docs_prets, ""),
         ("Mail/SMS liste documents envoyé", st.session_state.mail_docs, ""),
@@ -478,6 +514,7 @@ with st.sidebar:
         - Le projet précis arrive après la motivation.
         - Date, heure et adresse complète uniquement à la fin.
         - Éviter les RDV après 18h.
+        - Avant validation finale : vérifier que l’adresse existe et que la maison est cohérente visuellement.
         """)
 
 page = st.session_state.page
@@ -611,6 +648,55 @@ elif page == 5:
         box("RDV après 18h : à éviter, surtout avec familles/enfants. Risque de fatigue, repas, enfants, baisse d’attention et annulation.", "bad")
 
 elif page == 6:
+    script("Avant de valider définitivement le rendez-vous, on fait un contrôle rapide pour éviter les déplacements inutiles : adresse réelle, maison cohérente et prospect qui connaît bien son logement.")
+    q = full_address_query()
+    if not q:
+        box("Il faut d’abord saisir l’adresse complète dans l’onglet Décideurs & RDV pour lancer la vérification.", "bad")
+    else:
+        st.markdown(f"**Adresse à contrôler :** {q}")
+        c1, c2 = st.columns(2)
+        with c1:
+            url = maps_url()
+            if url:
+                st.link_button("🗺️ Ouvrir Google Maps", url)
+        with c2:
+            url2 = maps_url()
+            if url2:
+                st.link_button("🏠 Ouvrir Street View / vue maison", url2)
+        box("Objectif : ne pas piéger le client. On vérifie simplement que le déplacement de l’expert est justifié.", "ok")
+
+    st.markdown("#### Contrôle administratif")
+    yn("L’adresse existe réellement sur Google Maps ?", "adresse_maps")
+    yn("Street View / vue maison disponible ?", "streetview_ok")
+    yn("La maison est visible ou identifiable ?", "maison_visible")
+
+    st.markdown("#### Cohérence visuelle")
+    yn("La maison semble cohérente avec ce que le prospect a déclaré ?", "coherence_visuelle")
+    st.text_area("Élément visuel remarquable observé", key="detail_visuel", placeholder="Ex : garage à gauche, volets verts, portail blanc, toiture tuiles rouges, véranda, 1 étage...", height=80)
+    st.selectbox(
+        "Question discrète suggérée",
+        [None,
+         "Votre garage est bien accolé à la maison ?",
+         "Les chambres sont bien à l’étage ?",
+         "Vous avez toujours les volets battants / roulants en façade ?",
+         "Le portail donne bien directement sur l’entrée ?",
+         "Vous avez bien une véranda / extension sur la maison ?",
+         "La chaudière est plutôt côté garage, cave ou buanderie ?",
+         "Autre question personnalisée"],
+        key="question_verif",
+        format_func=lambda x: "Sélectionner" if x is None else x
+    )
+    st.text_area("Réponse du prospect / ressenti", key="reponse_verif", placeholder="Noter sa réponse naturellement : répond vite, hésite, ne connaît pas, réponse cohérente...", height=80)
+    yn("Après vérification, le RDV paraît réel et le déplacement justifié ?", "rdv_reel")
+
+    if st.session_state.adresse_maps == "Non" or st.session_state.coherence_visuelle == "Non" or st.session_state.rdv_reel == "Non":
+        box("Attention : risque élevé. Avant de bloquer un créneau, faire répéter l’adresse, vérifier le code postal/ville et reprendre une question simple sur la maison.", "bad")
+    elif st.session_state.rdv_reel == "Oui" and st.session_state.adresse_maps == "Oui":
+        box("Contrôle RDV réel validé. Le déplacement semble justifié.", "ok")
+    else:
+        box("Contrôle incomplet : à finaliser avant validation définitive du RDV.", "warn")
+
+elif page == 7:
     script("Pour que l’expert gagne du temps et puisse décider rapidement si le dossier peut être monté, pouvez-vous préparer les documents dans un dossier, en PDF ou en photos bien lisibles ?")
     yn("Documents prêts ou envoyables rapidement ?", "docs_prets")
     yn("Mail/SMS avec liste des documents envoyé ?", "mail_docs")
@@ -626,7 +712,7 @@ elif page == 6:
     """)
     box("Phrase : “Je reste avec vous quelques secondes, pouvez-vous me confirmer que vous avez bien reçu le mail avec la liste des documents ?”", "ok")
 
-elif page == 7:
+elif page == 8:
     st.selectbox("Statut final du lead", [None, "RDV validé", "RDV à confirmer", "À rappeler", "Non closable", "Hors critères"], key="statut", format_func=lambda x: "Sélectionner" if x is None else x)
     st.markdown("#### Note perso permanente")
     st.info(st.session_state.notes_perso or "Aucune note perso permanente saisie dans le volet de gauche.")
