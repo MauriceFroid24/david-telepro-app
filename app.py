@@ -90,13 +90,13 @@ DEFAULTS = {
     "prenom": "", "nom": "", "telephone": "", "email": "",
     "proprietaire": None, "maison_ind": None, "res_principale": None,
     "surface": None, "age_maison": None, "cp": "", "ville": "", "adresse": "",
-    "zone": None, "foyer": None, "rfr": "",
+    "zone": None, "foyer": None, "rfr": "", "enfants_charge": None,
     "situation_mr": None, "situation_mme": None, "revenus_mensuels": None, "age_mr": None, "age_mme": None,
     "chauffage": "", "age_chaudiere": None, "ecs": "", "emetteurs": "",
     "facture": "", "fonctionne": None,
     "declencheur": "", "gene": "", "changement": "", "urgence": None,
     "projets": [], "projet_autre": "",
-    "pret_lancer": None, "empechement": "", "budget": None, "mensualite": None,
+    "pret_lancer": None, "empechement": "", "budget": None, "mensualite": None, "credits": "",
     "decideurs": "", "tous_presents": None, "creneau_ok": None,
     "date_rdv": None, "heure_rdv": None, "duree": None,
     "docs_prets": None, "mail_docs": None, "mail_recu": None,
@@ -167,6 +167,7 @@ def missing_items():
         ("Prénom", st.session_state.prenom), ("Nom", st.session_state.nom), ("Téléphone", st.session_state.telephone),
         ("Code postal", st.session_state.cp), ("Ville", st.session_state.ville),
         ("Zone", st.session_state.zone),
+        ("Nombre d’enfants à charge", st.session_state.enfants_charge),
         ("Situation professionnelle Mr/Mme", st.session_state.situation_mr or st.session_state.situation_mme),
         ("Revenus mensuels", st.session_state.revenus_mensuels),
         ("Âge Mr/Mme", st.session_state.age_mr or st.session_state.age_mme),
@@ -192,91 +193,144 @@ def box(text, kind="warn"):
     st.markdown(f"<div class='{kind}'>{text}</div>", unsafe_allow_html=True)
 
 
+def report_value(value, suffix=""):
+    """Return clean value for report or None if empty/non renseigné."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        v = value.strip()
+        if not v or v in ["Non renseigné", "Non renseignée", "Sélectionner"]:
+            return None
+        return v + suffix
+    if isinstance(value, list):
+        return ", ".join(value) if value else None
+    return f"{value}{suffix}"
+
+
+def add_line(lines, label, value, suffix=""):
+    v = report_value(value, suffix)
+    if v is not None:
+        lines.append(f"{label} : {v}")
+
+
+def add_section(lines, title, items):
+    section = []
+    for label, value, suffix in items:
+        v = report_value(value, suffix)
+        if v is not None:
+            section.append(f"{label} : {v}")
+    if section:
+        lines.append(f"\n{title}")
+        lines.extend(section)
+
+
 def generate_report():
     score, plus, minus = compute_score()
     now = datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y %H:%M")
     missing = missing_items()
-    rdv = "Non fixé"
+    rdv = None
     if st.session_state.date_rdv and st.session_state.heure_rdv:
         rdv = f"{st.session_state.date_rdv.strftime('%d/%m/%Y')} à {st.session_state.heure_rdv.strftime('%H:%M')}"
-    return f"""RAPPORT RDV - ASSISTANT TÉLÉPRO ÉNERGIE
-Généré le : {now}
 
-SCORE QUALITÉ : {score}/100
-Statut : {st.session_state.statut or 'Non renseigné'}
-Projet : {project_label()}
+    lines = [
+        "RAPPORT RDV - ASSISTANT TÉLÉPRO ÉNERGIE",
+        f"Généré le : {now}",
+        "",
+        f"SCORE QUALITÉ : {score}/100",
+    ]
+    add_line(lines, "Statut", st.session_state.statut)
+    add_line(lines, "Projet", project_label() if project_label() != "Non renseigné" else None)
 
-PROSPECT
-Prénom / Nom : {st.session_state.prenom} {st.session_state.nom}
-Téléphone : {st.session_state.telephone}
-Email : {st.session_state.email or 'Non renseigné'}
-Adresse RDV : {st.session_state.adresse or 'Non renseignée'} - {st.session_state.cp} {st.session_state.ville}
-Zone : {st.session_state.zone or 'Non renseignée'}
+    # Le rapport commence volontairement par les informations techniques.
+    add_section(lines, "INFOS TECHNIQUES - LOGEMENT", [
+        ("Propriétaire", st.session_state.proprietaire, ""),
+        ("Maison individuelle", st.session_state.maison_ind, ""),
+        ("Résidence principale", st.session_state.res_principale, ""),
+        ("Surface", st.session_state.surface, " m²"),
+        ("Âge de la maison", st.session_state.age_maison, " ans"),
+        ("Zone", st.session_state.zone, ""),
+    ])
 
-LOGEMENT
-Propriétaire : {st.session_state.proprietaire}
-Maison individuelle : {st.session_state.maison_ind}
-Résidence principale : {st.session_state.res_principale}
-Surface : {st.session_state.surface or 'Non renseignée'} m²
-Âge de la maison : {st.session_state.age_maison or 'Non renseigné'} ans
-Foyer : {st.session_state.foyer or 'Non renseigné'} personnes
-RFR : {st.session_state.rfr or 'Non renseigné'}
-Situation professionnelle Monsieur : {st.session_state.situation_mr or 'Non renseignée'}
-Situation professionnelle Madame : {st.session_state.situation_mme or 'Non renseignée'}
-Revenus mensuels du foyer : {st.session_state.revenus_mensuels or 'Non renseignés'} €
-Âge Monsieur : {st.session_state.age_mr or 'Non renseigné'} ans
-Âge Madame : {st.session_state.age_mme or 'Non renseigné'} ans
+    add_section(lines, "INSTALLATION ACTUELLE", [
+        ("Chauffage", st.session_state.chauffage, ""),
+        ("Âge système", st.session_state.age_chaudiere, " ans"),
+        ("Fonctionne correctement", st.session_state.fonctionne, ""),
+        ("Eau chaude", st.session_state.ecs, ""),
+        ("Émetteurs", st.session_state.emetteurs, ""),
+        ("Facture / consommation", st.session_state.facture, ""),
+    ])
 
-INSTALLATION ACTUELLE
-Chauffage : {st.session_state.chauffage or 'Non renseigné'}
-Âge système : {st.session_state.age_chaudiere or 'Non renseigné'} ans
-Fonctionne correctement : {st.session_state.fonctionne}
-Eau chaude : {st.session_state.ecs or 'Non renseigné'}
-Émetteurs : {st.session_state.emetteurs or 'Non renseigné'}
-Facture / consommation : {st.session_state.facture or 'Non renseigné'}
+    add_section(lines, "INFOS FINANCIÈRES / FOYER", [
+        ("Nombre de personnes au foyer", st.session_state.foyer, ""),
+        ("Nombre d’enfants à charge", st.session_state.enfants_charge, ""),
+        ("RFR", st.session_state.rfr, ""),
+        ("Situation professionnelle Monsieur", st.session_state.situation_mr, ""),
+        ("Situation professionnelle Madame", st.session_state.situation_mme, ""),
+        ("Revenus mensuels du foyer", st.session_state.revenus_mensuels, " €"),
+        ("Âge Monsieur", st.session_state.age_mr, " ans"),
+        ("Âge Madame", st.session_state.age_mme, " ans"),
+        ("Crédits contractés / objets", st.session_state.credits, ""),
+    ])
 
-MOTIVATION CLIENT
-Déclencheur : {st.session_state.declencheur or 'Non renseigné'}
-Gêne principale : {st.session_state.gene or 'Non renseigné'}
-Ce que ça changerait : {st.session_state.changement or 'Non renseigné'}
-Urgence : {st.session_state.urgence or 'Non renseignée'}
+    add_section(lines, "MOTIVATION CLIENT", [
+        ("Déclencheur", st.session_state.declencheur, ""),
+        ("Gêne principale", st.session_state.gene, ""),
+        ("Ce que ça changerait", st.session_state.changement, ""),
+        ("Urgence", st.session_state.urgence, ""),
+    ])
 
-ENGAGEMENT / BUDGET
-Prêt à lancer si faisable + rentable + budget OK : {st.session_state.pret_lancer}
-Ce qui pourrait bloquer : {st.session_state.empechement or 'Non renseigné'}
-Budget : {st.session_state.budget or 'Non renseigné'}
-Fourchette mensualité acceptable : {st.session_state.mensualite or 'Non renseignée'}
+    add_section(lines, "ENGAGEMENT / BUDGET", [
+        ("Prêt à lancer si faisable + rentable + budget OK", st.session_state.pret_lancer, ""),
+        ("Ce qui pourrait bloquer", st.session_state.empechement, ""),
+        ("Budget", st.session_state.budget, ""),
+        ("Fourchette mensualité acceptable", st.session_state.mensualite, ""),
+    ])
 
-DÉCIDEURS
-Décideurs : {st.session_state.decideurs or 'Non renseigné'}
-Tous présents : {st.session_state.tous_presents}
-Second RDV payant expliqué : {st.session_state.creneau_ok}
+    add_section(lines, "DÉCIDEURS", [
+        ("Décideurs", st.session_state.decideurs, ""),
+        ("Tous présents", st.session_state.tous_presents, ""),
+        ("Second RDV payant expliqué", st.session_state.creneau_ok, ""),
+    ])
 
-RENDEZ-VOUS
-Date / heure : {rdv}
-Durée annoncée : {st.session_state.duree or 'Non renseignée'}
-Adresse complète : {st.session_state.adresse or 'Non renseignée'}
+    add_section(lines, "RENDEZ-VOUS", [
+        ("Date / heure", rdv, ""),
+        ("Durée annoncée", st.session_state.duree, ""),
+    ])
 
-DOCUMENTS
-Documents prêts ou envoyables : {st.session_state.docs_prets}
-Mail/SMS liste documents envoyé : {st.session_state.mail_docs}
-Réception du mail/SMS confirmée : {st.session_state.mail_recu}
+    add_section(lines, "DOCUMENTS", [
+        ("Documents prêts ou envoyables", st.session_state.docs_prets, ""),
+        ("Mail/SMS liste documents envoyé", st.session_state.mail_docs, ""),
+        ("Réception du mail/SMS confirmée", st.session_state.mail_recu, ""),
+    ])
 
-POINTS FORTS
-- {(chr(10)+'- ').join(plus) if plus else 'Aucun point fort renseigné'}
+    if plus:
+        lines.append("\nPOINTS FORTS")
+        lines.extend(["- " + x for x in plus])
+    if minus:
+        lines.append("\nPOINTS DE VIGILANCE")
+        lines.extend(["- " + x for x in minus])
+    if missing:
+        lines.append("\nCE QUI RESTE À COMPLÉTER")
+        lines.extend(["- " + x for x in missing])
 
-POINTS DE VIGILANCE
-- {(chr(10)+'- ').join(minus) if minus else 'Aucun point de vigilance majeur'}
+    if st.session_state.notes_perso.strip():
+        lines.append("\nNOTES PERSO PERMANENTES")
+        lines.append(st.session_state.notes_perso.strip())
+    if st.session_state.notes.strip():
+        lines.append("\nNOTES BRUTES DAVID")
+        lines.append(st.session_state.notes.strip())
 
-CE QUI RESTE À COMPLÉTER
-- {(chr(10)+'- ').join(missing) if missing else 'Tout est complet'}
+    # Coordonnées volontairement à la fin du rapport.
+    add_section(lines, "COORDONNÉES PROSPECT", [
+        ("Prénom / Nom", (st.session_state.prenom + " " + st.session_state.nom).strip(), ""),
+        ("Téléphone", st.session_state.telephone, ""),
+        ("Email", st.session_state.email, ""),
+        ("Adresse RDV", st.session_state.adresse, ""),
+        ("Code postal", st.session_state.cp, ""),
+        ("Ville", st.session_state.ville, ""),
+    ])
 
-NOTES PERSO PERMANENTES
-{st.session_state.notes_perso or 'Aucune note perso'}
-
-NOTES BRUTES DAVID
-{st.session_state.notes or 'Aucune note'}
-"""
+    return "\n".join(lines) + "\n"
 
 
 def go(delta):
@@ -346,7 +400,8 @@ if page == 0:
     box("Ne demande pas l’adresse complète au début. On la demande à la fin, quand le rendez-vous est justifié.", "warn")
 
 elif page == 1:
-    script("Je vais vous poser quelques questions rapides sur la maison. L’objectif est d’éviter de déplacer un expert si le logement ne correspond pas du tout aux critères techniques.")
+    script("Je vais vous poser quelques questions rapides sur la maison. On commence par la partie technique pour éviter de déplacer un expert si le logement ne correspond pas aux critères de faisabilité.")
+    st.markdown("#### 1. Infos techniques logement")
     yn("Propriétaire ?", "proprietaire")
     yn("Maison individuelle ?", "maison_ind")
     yn("Résidence principale ?", "res_principale")
@@ -355,24 +410,29 @@ elif page == 1:
     st.selectbox("Zone climatique", [None, "H1", "H2", "H3", "À confirmer"], key="zone", format_func=lambda x: "Sélectionner" if x is None else x)
     if st.session_state.zone in ["H2", "H3", "À confirmer"]:
         box("Ne pas annoncer les conditions H1 si la zone est H2/H3 ou incertaine. Dire que l’expert vérifiera les aides exactes.", "warn")
-    st.number_input("Nombre de personnes au foyer", min_value=0, max_value=12, step=1, key="foyer", value=None)
-    st.text_input("Revenu fiscal de référence si connu", key="rfr", placeholder="Ne pas bloquer si le client ne sait pas")
-    st.markdown("#### Situation du foyer")
-    st.selectbox("Situation professionnelle Monsieur", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraité depuis moins de 2 ans", "Retraité depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mr", format_func=lambda x: "Sélectionner" if x is None else x)
-    st.selectbox("Situation professionnelle Madame", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraitée depuis moins de 2 ans", "Retraitée depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mme", format_func=lambda x: "Sélectionner" if x is None else x)
-    st.number_input("Revenus mensuels du foyer (€)", min_value=0, max_value=30000, step=100, key="revenus_mensuels", value=None, placeholder="Ex : 3200")
-    c_age1, c_age2 = st.columns(2)
-    with c_age1:
-        st.number_input("Âge de Monsieur", min_value=0, max_value=110, step=1, key="age_mr", value=None)
-    with c_age2:
-        st.number_input("Âge de Madame", min_value=0, max_value=110, step=1, key="age_mme", value=None)
-    box("Financement : si contrat de travail, demander seulement la dernière fiche de paie. Si retraité depuis moins de 2 ans, demander l’attestation de retraite. Ne pas surcharger le client avec des documents inutiles.", "ok")
+
+    st.markdown("#### 2. Installation actuelle")
     st.text_input("Chauffage actuel", key="chauffage", placeholder="Gaz, fioul, électrique...")
     st.number_input("Âge chaudière / système actuel", min_value=0, max_value=60, step=1, key="age_chaudiere", value=None)
     yn("Le système fonctionne encore correctement ?", "fonctionne")
     st.text_input("Production d’eau chaude", key="ecs", placeholder="Chaudière, ballon électrique, BTD...")
     st.text_input("Émetteurs", key="emetteurs", placeholder="Radiateurs à eau, plancher chauffant, splits...")
     st.text_input("Facture / consommation actuelle", key="facture", placeholder="Ex : 220 €/mois gaz + électricité")
+
+    st.markdown("#### 3. Infos financières / foyer")
+    st.number_input("Nombre de personnes au foyer", min_value=0, max_value=12, step=1, key="foyer", value=None)
+    st.number_input("Nombre d’enfants à charge", min_value=0, max_value=10, step=1, key="enfants_charge", value=None)
+    st.text_input("Revenu fiscal de référence si connu", key="rfr", placeholder="Ne pas bloquer si le client ne sait pas")
+    st.selectbox("Situation professionnelle Monsieur", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraité depuis moins de 2 ans", "Retraité depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mr", format_func=lambda x: "Sélectionner" if x is None else x)
+    st.selectbox("Situation professionnelle Madame", [None, "CDI", "CDD", "Intérim", "Indépendant", "Retraitée depuis moins de 2 ans", "Retraitée depuis plus de 2 ans", "Sans emploi", "Autre / à préciser"], key="situation_mme", format_func=lambda x: "Sélectionner" if x is None else x)
+    st.number_input("Revenus mensuels du foyer (€)", min_value=0, max_value=30000, step=100, key="revenus_mensuels", value=None, placeholder="Ex : 3200")
+    st.text_area("Crédits en cours + objet", key="credits", placeholder="Ex : crédit auto 280 €/mois, prêt conso 120 €/mois, crédit immo 850 €/mois...", height=80)
+    c_age1, c_age2 = st.columns(2)
+    with c_age1:
+        st.number_input("Âge de Monsieur", min_value=0, max_value=110, step=1, key="age_mr", value=None)
+    with c_age2:
+        st.number_input("Âge de Madame", min_value=0, max_value=110, step=1, key="age_mme", value=None)
+    box("Financement : si contrat de travail, demander seulement la dernière fiche de paie. Si retraité depuis moins de 2 ans, demander l’attestation de retraite. Ne pas surcharger le client avec des documents inutiles.", "ok")
 
 elif page == 2:
     script("Avant de parler du type de solution, j’ai besoin de comprendre ce qui vous a poussé à faire la demande. L’expert ne se déplace que si le projet peut avoir un vrai intérêt pour vous.")
