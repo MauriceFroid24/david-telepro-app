@@ -77,10 +77,46 @@ st.markdown(
         background:#17498f; color:white; font-weight:800; cursor:pointer; font-size:16px;
     }
     .copy-btn:active { transform: scale(.99); }
+    .app-header {
+        display:flex; align-items:center; justify-content:space-between; gap:12px;
+        margin: 0 0 6px 0;
+    }
+    .app-title {
+        font-size:1.55rem; font-weight:800; color:#ffffff; line-height:1.2;
+    }
+    .version-badge {
+        background:#122542; border:1px solid #345886; color:#cfe2ff;
+        border-radius:999px; padding:6px 10px; font-size:.78rem; font-weight:800;
+        white-space:nowrap;
+    }
+    .version-card {
+        background:#0b1728; border:1px solid #263753; border-radius:12px;
+        padding:10px 12px; margin-bottom:10px;
+    }
+
+    /* Calendrier date_input : correction blanc sur blanc */
+    [data-baseweb="calendar"], [data-baseweb="calendar"] * {
+        background:#111a2a !important;
+        color:#ffffff !important;
+        fill:#ffffff !important;
+    }
+    [data-baseweb="calendar"] button {
+        background:#16233a !important;
+        color:#ffffff !important;
+        border-color:#304461 !important;
+    }
+    [aria-label*="calendar"], [aria-label*="Calendar"] {
+        background:#111a2a !important;
+        color:#ffffff !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+APP_VERSION = "v0.14.0"
+APP_VERSION_LABEL = "Version 14"
+APP_UPDATED_AT = "09/07/2026"
 
 PAGES = [
     "Contact", "Logement", "Motivation", "Projet", "Engagement", "Décideurs & RDV", "Documents", "Rapport"
@@ -89,10 +125,10 @@ PAGES = [
 DEFAULTS = {
     "prenom": "", "nom": "", "telephone": "", "email": "",
     "proprietaire": None, "maison_ind": None, "res_principale": None,
-    "surface": None, "age_maison": None, "cp": "", "ville": "", "adresse": "",
+    "surface": None, "annee_construction": None, "cp": "", "ville": "", "adresse": "",
     "zone": None, "foyer": None, "rfr": "", "enfants_charge": None,
     "situation_mr": None, "situation_mme": None, "revenus_mensuels": None, "age_mr": None, "age_mme": None,
-    "chauffage": "", "age_chaudiere": None, "ecs": "", "emetteurs": "",
+    "chauffage": "", "chauffage_gaz": False, "chauffage_fioul": False, "chauffage_elec": False, "chauffage_bois": False, "chauffage_pac": False, "chauffage_clim": False, "chauffage_autre": "", "age_chaudiere": None, "ecs": "", "emetteurs": "",
     "facture": "", "fonctionne": None,
     "declencheur": "", "gene": "", "changement": "", "urgence": None,
     "projets": [], "projet_autre": "",
@@ -129,6 +165,65 @@ def done(value):
     return True
 
 
+def climate_zone_from_cp(cp):
+    cp = (cp or "").strip().upper().replace(" ", "")
+    if len(cp) < 2:
+        return None
+    # Les codes postaux corses commencent par 20 et relèvent de la zone H3.
+    if cp.startswith("20"):
+        return "H3"
+    dep = cp[:2]
+    h1 = {"01","02","03","05","08","10","14","15","19","21","23","25","27","28","38","39","42","43","45","51","52","54","55","57","58","59","60","61","62","63","67","68","69","70","71","73","74","76","77","78","80","87","88","89","90","91","92","93","94","95"}
+    h2 = {"04","07","09","12","16","17","18","22","24","26","29","31","32","33","35","36","37","40","41","44","46","47","48","49","50","53","56","64","65","72","79","81","82","84","85","86"}
+    h3 = {"06","11","13","30","34","66","83"}
+    if dep in h1: return "H1"
+    if dep in h2: return "H2"
+    if dep in h3: return "H3"
+    return None
+
+def parse_hour(value):
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            h, m = value.split(":")
+            return time(int(h), int(m))
+        except Exception:
+            return None
+    return None
+
+def heating_label():
+    vals = []
+    for key, label in [
+        ("chauffage_gaz", "Gaz"), ("chauffage_fioul", "Fioul"), ("chauffage_elec", "Électrique"),
+        ("chauffage_bois", "Bois / granulés"), ("chauffage_pac", "Pompe à chaleur existante"),
+        ("chauffage_clim", "Climatisation réversible"),
+    ]:
+        if st.session_state.get(key):
+            vals.append(label)
+    other = (st.session_state.get("chauffage_autre") or "").strip()
+    if other:
+        vals.append(other)
+    return " + ".join(vals)
+
+def house_age_from_year():
+    y = st.session_state.get("annee_construction")
+    if y:
+        return max(0, datetime.now().year - int(y))
+    return None
+
+def half_hour_options():
+    out = []
+    for h in range(8, 23):
+        for m in (0, 30):
+            if h == 22 and m == 30:
+                continue
+            out.append(f"{h:02d}:{m:02d}")
+    return out
+
+
 def project_label():
     parts = list(st.session_state.projets or [])
     if st.session_state.projet_autre.strip():
@@ -145,8 +240,8 @@ def compute_score():
     elif st.session_state.maison_ind == "Non": score -= 25; minus.append("pas maison individuelle")
     if st.session_state.res_principale == "Oui": score += 6; plus.append("résidence principale")
     if st.session_state.surface and st.session_state.surface >= 90: score += 8; plus.append("surface intéressante")
-    if st.session_state.age_maison and st.session_state.age_maison >= 15: score += 4; plus.append("maison suffisamment ancienne")
-    if st.session_state.chauffage.lower().strip() in ["gaz", "fioul"]: score += 8; plus.append("chauffage compatible remplacement")
+    if house_age_from_year() and house_age_from_year() >= 15: score += 4; plus.append("maison suffisamment ancienne")
+    if st.session_state.chauffage_gaz or st.session_state.chauffage_fioul: score += 8; plus.append("chauffage compatible remplacement")
     if st.session_state.age_chaudiere and st.session_state.age_chaudiere >= 15: score += 8; plus.append("système ancien")
     if st.session_state.declencheur.strip(): score += 8; plus.append("motivation identifiée")
     if st.session_state.gene.strip(): score += 8
@@ -157,7 +252,8 @@ def compute_score():
     elif st.session_state.tous_presents == "Non": score -= 35; minus.append("décideurs absents")
     if st.session_state.docs_prets == "Oui": score += 7; plus.append("documents prêts")
     if st.session_state.mail_recu == "Oui": score += 5; plus.append("mail documents confirmé")
-    if st.session_state.heure_rdv and st.session_state.heure_rdv >= time(18,0):
+    hr = parse_hour(st.session_state.heure_rdv)
+    if hr and hr >= time(18,0):
         score -= 10; minus.append("RDV après 18h")
     return max(0, min(100, score)), plus, minus
 
@@ -173,8 +269,8 @@ def missing_items():
         ("Âge Mr/Mme", st.session_state.age_mr or st.session_state.age_mme),
         ("Propriétaire", st.session_state.proprietaire),
         ("Maison individuelle", st.session_state.maison_ind), ("Résidence principale", st.session_state.res_principale),
-        ("Surface", st.session_state.surface), ("Âge de la maison", st.session_state.age_maison),
-        ("Chauffage actuel", st.session_state.chauffage), ("Âge système", st.session_state.age_chaudiere),
+        ("Surface", st.session_state.surface), ("Année de construction", st.session_state.annee_construction),
+        ("Chauffage actuel", heating_label()), ("Âge système", st.session_state.age_chaudiere),
         ("Motivation", st.session_state.declencheur), ("Gêne principale", st.session_state.gene),
         ("Type de projet", st.session_state.projets or st.session_state.projet_autre),
         ("Engagement", st.session_state.pret_lancer), ("Décideurs", st.session_state.decideurs),
@@ -230,7 +326,7 @@ def generate_report():
     missing = missing_items()
     rdv = None
     if st.session_state.date_rdv and st.session_state.heure_rdv:
-        rdv = f"{st.session_state.date_rdv.strftime('%d/%m/%Y')} à {st.session_state.heure_rdv.strftime('%H:%M')}"
+        rdv = f"{st.session_state.date_rdv.strftime('%d/%m/%Y')} à {st.session_state.heure_rdv}"
 
     lines = [
         "RAPPORT RDV - ASSISTANT TÉLÉPRO ÉNERGIE",
@@ -247,17 +343,17 @@ def generate_report():
         ("Maison individuelle", st.session_state.maison_ind, ""),
         ("Résidence principale", st.session_state.res_principale, ""),
         ("Surface", st.session_state.surface, " m²"),
-        ("Âge de la maison", st.session_state.age_maison, " ans"),
-        ("Zone", st.session_state.zone, ""),
+        ("Année de construction", st.session_state.annee_construction, ""),
+        ("Zone climatique auto", st.session_state.zone, ""),
     ])
 
     add_section(lines, "INSTALLATION ACTUELLE", [
-        ("Chauffage", st.session_state.chauffage, ""),
+        ("Chauffage", heating_label(), ""),
         ("Âge système", st.session_state.age_chaudiere, " ans"),
         ("Fonctionne correctement", st.session_state.fonctionne, ""),
         ("Eau chaude", st.session_state.ecs, ""),
         ("Émetteurs", st.session_state.emetteurs, ""),
-        ("Facture / consommation", st.session_state.facture, ""),
+        ("Facture / consommation mensuelle", st.session_state.facture, ""),
     ])
 
     add_section(lines, "INFOS FINANCIÈRES / FOYER", [
@@ -349,6 +445,13 @@ missing = missing_items()
 
 with st.sidebar:
     st.markdown("## 📞 Télépro")
+    st.markdown(f"""
+    <div class='version-card'>
+        <b>🟢 Version installée</b><br>
+        {APP_VERSION} — {APP_VERSION_LABEL}<br>
+        <span class='mini'>Mise à jour : {APP_UPDATED_AT}</span>
+    </div>
+    """, unsafe_allow_html=True)
     st.caption("Navigation rapide")
     selected = st.radio("Étapes", PAGES, index=st.session_state.page, label_visibility="collapsed")
     st.session_state.page = PAGES.index(selected)
@@ -378,8 +481,13 @@ with st.sidebar:
         """)
 
 page = st.session_state.page
-st.title("📞 Assistant Télépro Énergie")
-st.caption("Mode sombre iPad — navigation rapide, faible surcharge, qualification terrain.")
+st.markdown(f"""
+<div class='app-header'>
+  <div class='app-title'>📞 Assistant Télépro Énergie</div>
+  <div class='version-badge'>{APP_VERSION}</div>
+</div>
+""", unsafe_allow_html=True)
+st.caption(f"Mode sombre iPad — navigation rapide, faible surcharge, qualification terrain. Dernière mise à jour : {APP_UPDATED_AT}.")
 st.progress((page + 1) / len(PAGES))
 
 h1, h2, h3 = st.columns(3)
@@ -396,6 +504,12 @@ if page == 0:
     st.text_input("Téléphone", key="telephone", placeholder="06...")
     st.text_input("Email", key="email", placeholder="email@exemple.fr")
     st.text_input("Code postal", key="cp", placeholder="Ex : 77100")
+    auto_zone = climate_zone_from_cp(st.session_state.cp)
+    st.session_state.zone = auto_zone
+    if auto_zone:
+        box(f"Zone climatique détectée automatiquement : {auto_zone}", "ok")
+    elif st.session_state.cp.strip():
+        box("Zone climatique non détectée automatiquement pour ce code postal. L’expert vérifiera.", "warn")
     st.text_input("Ville", key="ville", placeholder="Ex : Meaux")
     box("Ne demande pas l’adresse complète au début. On la demande à la fin, quand le rendez-vous est justifié.", "warn")
 
@@ -406,18 +520,34 @@ elif page == 1:
     yn("Maison individuelle ?", "maison_ind")
     yn("Résidence principale ?", "res_principale")
     st.number_input("Surface chauffée approximative (m²)", min_value=0, max_value=500, step=5, key="surface", value=None, placeholder="Ex : 120")
-    st.number_input("Âge approximatif de la maison", min_value=0, max_value=250, step=1, key="age_maison", value=None, placeholder="Ex : 35")
-    st.selectbox("Zone climatique", [None, "H1", "H2", "H3", "À confirmer"], key="zone", format_func=lambda x: "Sélectionner" if x is None else x)
-    if st.session_state.zone in ["H2", "H3", "À confirmer"]:
+    st.number_input("Année de construction", min_value=1800, max_value=datetime.now().year, step=1, key="annee_construction", value=None, placeholder="Ex : 1985")
+    auto_zone = climate_zone_from_cp(st.session_state.cp)
+    st.session_state.zone = auto_zone
+    if auto_zone:
+        box(f"Zone climatique détectée automatiquement depuis le code postal : {auto_zone}", "ok")
+    else:
+        box("Zone climatique non déterminée : ne pas annoncer de primes précises avant vérification.", "warn")
+    if st.session_state.zone in ["H2", "H3", "À confirmer"] or st.session_state.zone is None:
         box("Ne pas annoncer les conditions H1 si la zone est H2/H3 ou incertaine. Dire que l’expert vérifiera les aides exactes.", "warn")
 
     st.markdown("#### 2. Installation actuelle")
-    st.text_input("Chauffage actuel", key="chauffage", placeholder="Gaz, fioul, électrique...")
+    st.markdown("Chauffage actuel")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.checkbox("Gaz", key="chauffage_gaz")
+        st.checkbox("Électrique", key="chauffage_elec")
+        st.checkbox("Pompe à chaleur existante", key="chauffage_pac")
+    with c2:
+        st.checkbox("Fioul", key="chauffage_fioul")
+        st.checkbox("Bois / granulés", key="chauffage_bois")
+        st.checkbox("Climatisation réversible", key="chauffage_clim")
+    st.text_input("Autre chauffage / précision", key="chauffage_autre", placeholder="Ex : gaz + cheminée, chaudière hybride...")
+    st.session_state.chauffage = heating_label()
     st.number_input("Âge chaudière / système actuel", min_value=0, max_value=60, step=1, key="age_chaudiere", value=None)
     yn("Le système fonctionne encore correctement ?", "fonctionne")
     st.text_input("Production d’eau chaude", key="ecs", placeholder="Chaudière, ballon électrique, BTD...")
     st.text_input("Émetteurs", key="emetteurs", placeholder="Radiateurs à eau, plancher chauffant, splits...")
-    st.text_input("Facture / consommation actuelle", key="facture", placeholder="Ex : 220 €/mois gaz + électricité")
+    st.text_input("Facture / consommation mensuelle actuelle", key="facture", placeholder="Ex : 220 €/mois gaz + électricité")
 
     st.markdown("#### 3. Infos financières / foyer")
     st.number_input("Nombre de personnes au foyer", min_value=0, max_value=12, step=1, key="foyer", value=None)
@@ -474,9 +604,10 @@ elif page == 5:
     st.markdown("#### Adresse et créneau uniquement maintenant")
     st.text_input("Adresse complète du rendez-vous", key="adresse", placeholder="N°, rue, complément")
     st.date_input("Date du RDV", key="date_rdv", value=None, format="DD/MM/YYYY")
-    st.time_input("Heure du RDV", key="heure_rdv", value=None, step=900)
+    st.selectbox("Heure du RDV", [None] + half_hour_options(), key="heure_rdv", format_func=lambda x: "Sélectionner" if x is None else x)
     st.selectbox("Durée annoncée", [None, "1h30 à 2h", "2h", "2h à 2h30"], key="duree", format_func=lambda x: "Sélectionner" if x is None else x)
-    if st.session_state.heure_rdv and st.session_state.heure_rdv >= time(18,0):
+    hr = parse_hour(st.session_state.heure_rdv)
+    if hr and hr >= time(18,0):
         box("RDV après 18h : à éviter, surtout avec familles/enfants. Risque de fatigue, repas, enfants, baisse d’attention et annulation.", "bad")
 
 elif page == 6:
